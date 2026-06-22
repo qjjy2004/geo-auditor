@@ -30,7 +30,7 @@ import argparse
 from collections import Counter
 from typing import Optional
 
-VERSION = "1.6.0"
+VERSION = "0.6.0"
 
 # ════════════════════════════════════
 # Default patterns (can be overridden via --config)
