@@ -1,0 +1,241 @@
+{
+  "title": "Best Seismic Bracing Solutions 2026 — Buy Now at Discount Prices!",
+  "total": 38,
+  "maxTotal": 100,
+  "pct": 38,
+  "raw_pct": 38,
+  "adaptive_pct": 38,
+  "grade": "C",
+  "dimensions": [
+    {
+      "n": "Conclusion-First",
+      "s": 6,
+      "m": 10,
+      "d": "Has intro but lead with answer next time",
+      "icon": "📍"
+    },
+    {
+      "n": "Data Anchors",
+      "s": 0,
+      "m": 10,
+      "d": "Add specific numbers and sources",
+      "icon": "📊"
+    },
+    {
+      "n": "Structure",
+      "s": 1,
+      "m": 8,
+      "d": "Add numbered steps or bullet points",
+      "icon": "🔢"
+    },
+    {
+      "n": "Comparison",
+      "s": 2,
+      "m": 8,
+      "d": "Missing comparison — add contrasts",
+      "icon": "⚖️"
+    },
+    {
+      "n": "FAQ Module",
+      "s": 1,
+      "m": 8,
+      "d": "Add 2-3 Q&As — AI loves answering questions",
+      "icon": "❓"
+    },
+    {
+      "n": "Title Quality",
+      "s": 5,
+      "m": 8,
+      "d": "Good, add a number",
+      "icon": "📌"
+    },
+    {
+      "n": "Keyword Density",
+      "s": 8,
+      "m": 8,
+      "d": "\"seismic bracing\" well covered (≥3x)",
+      "icon": "🔑"
+    },
+    {
+      "n": "Paragraph Length",
+      "s": 4,
+      "m": 6,
+      "d": "Paragraphs a bit long/short",
+      "icon": "📏"
+    },
+    {
+      "n": "Sources",
+      "s": 1,
+      "m": 6,
+      "d": "Add citations or data sources",
+      "icon": "📖"
+    },
+    {
+      "n": "CTA",
+      "s": 2,
+      "m": 4,
+      "d": "Add a CTA at the end",
+      "icon": "🎯"
+    },
+    {
+      "n": "Entity Info",
+      "s": 3,
+      "m": 8,
+      "d": "Has basic entity info",
+      "icon": "🏢"
+    },
+    {
+      "n": "EEAT",
+      "s": 2,
+      "m": 8,
+      "d": "Add experience/credentials/citations",
+      "icon": "🛡️"
+    },
+    {
+      "n": "Semantic Match",
+      "s": 0,
+      "m": 4,
+      "d": "Title and content intent mismatch",
+      "icon": "🔗"
+    },
+    {
+      "n": "Anti-AI Voice",
+      "s": 3,
+      "m": 4,
+      "d": "Minor signals: burstiness=2.8(low)",
+      "icon": "🤖"
+    }
+  ],
+  "suggestions": [
+    {
+      "t": "fix",
+      "m": "Data Anchors low: Add specific numbers and sources"
+    },
+    {
+      "t": "fix",
+      "m": "Structure low: Add numbered steps or bullet points"
+    },
+    {
+      "t": "fix",
+      "m": "Comparison low: Missing comparison — add contrasts"
+    },
+    {
+      "t": "fix",
+      "m": "FAQ Module low: Add 2-3 Q&As — AI loves answering questions"
+    },
+    {
+      "t": "fix",
+      "m": "Sources low: Add citations or data sources"
+    },
+    {
+      "t": "fix",
+      "m": "Entity Info low: Has basic entity info"
+    },
+    {
+      "t": "fix",
+      "m": "EEAT low: Add experience/credentials/citations"
+    },
+    {
+      "t": "fix",
+      "m": "Semantic Match low: Title and content intent mismatch"
+    }
+  ],
+  "rewrite_hints": [
+    {
+      "action": "add_numbers",
+      "instruction": "Add 2-3 specific numbers (% or counts or amounts) with units. Add 1-2 source citations or standard references.",
+      "target_section": "throughout",
+      "dimension": "Data Anchors",
+      "current": 0,
+      "max": 10,
+      "severity": 0.0
+    },
+    {
+      "action": "add_numbered_list",
+      "instruction": "Convert one section into a numbered list (3-5 items). Use \"1. / 2. / 3.\" or bullet points.",
+      "target_section": "middle_section",
+      "dimension": "Structure",
+      "current": 1,
+      "max": 8,
+      "severity": 0.125
+    },
+    {
+      "action": "add_contrast",
+      "instruction": "Add at least one A vs B comparison. Use \"vs\", \"compared to\", \"rather than\", or numeric contrast (\"X is 3x more than Y\").",
+      "target_section": "any_paragraph",
+      "dimension": "Comparison",
+      "current": 2,
+      "max": 8,
+      "severity": 0.25
+    },
+    {
+      "action": "add_qa_section",
+      "instruction": "Add 2-3 Q&A pairs at the end. Format: \"Q: [question] A: [answer]\". Use questions real users would search for.",
+      "target_section": "end_of_content",
+      "dimension": "FAQ Module",
+      "current": 1,
+      "max": 8,
+      "severity": 0.125
+    },
+    {
+      "action": "add_citations",
+      "instruction": "Add at least 2 verifiable references. Mention specific studies, standards, reports, or link to source data.",
+      "target_section": "throughout",
+      "dimension": "Sources",
+      "current": 1,
+      "max": 6,
+      "severity": 0.16666666666666666
+    },
+    {
+      "action": "add_context",
+      "instruction": "Add a location name (city/province) and an organization/company name. Mention a specific time period or year.",
+      "target_section": "early_paragraphs",
+      "dimension": "Entity Info",
+      "current": 3,
+      "max": 8,
+      "severity": 0.375
+    },
+    {
+      "action": "add_credibility",
+      "instruction": "Add experience signal (\"X years in this field\") AND a credential or third-party validation reference.",
+      "target_section": "intro_or_body",
+      "dimension": "EEAT",
+      "current": 2,
+      "max": 8,
+      "severity": 0.25
+    },
+    {
+      "action": "align_title_body",
+      "instruction": "Make sure the body directly answers the question/claim in the title. Use the title keyword in the first paragraph.",
+      "target_section": "title_and_opening",
+      "dimension": "Semantic Match",
+      "current": 0,
+      "max": 4,
+      "severity": 0.0
+    }
+  ],
+  "voice_details": {
+    "ai_word_count": 0,
+    "ai_words_found": [],
+    "rlhf_signals": [],
+    "burstiness": 2.8,
+    "sentence_diversity": 1.0,
+    "sentence_count": 28,
+    "simple_declarative_pct": 0,
+    "opener_repeats": 0,
+    "repeated_openers": [],
+    "punctuation": {
+      "em_dash_count": 3,
+      "em_dash_per_500_chars": 1.2,
+      "semicolon_count": 0,
+      "curly_quote_count": 0,
+      "punct_score": 1.0
+    }
+  },
+  "stats": {
+    "textLength": 1250,
+    "paraCount": 7,
+    "avgParaLen": 167,
+    "dataCount": 0
+  }
+}

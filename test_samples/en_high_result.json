@@ -1,0 +1,222 @@
+{
+  "title": "",
+  "total": 53,
+  "maxTotal": 100,
+  "pct": 53,
+  "raw_pct": 53,
+  "adaptive_pct": 53,
+  "grade": "B",
+  "dimensions": [
+    {
+      "n": "Conclusion-First",
+      "s": 6,
+      "m": 10,
+      "d": "Has intro but lead with answer next time",
+      "icon": "📍"
+    },
+    {
+      "n": "Data Anchors",
+      "s": 8,
+      "m": 10,
+      "d": "3 data pts. Decent",
+      "icon": "📊"
+    },
+    {
+      "n": "Structure",
+      "s": 4,
+      "m": 8,
+      "d": "Has basic structure",
+      "icon": "🔢"
+    },
+    {
+      "n": "Comparison",
+      "s": 2,
+      "m": 8,
+      "d": "Missing comparison — add contrasts",
+      "icon": "⚖️"
+    },
+    {
+      "n": "FAQ Module",
+      "s": 1,
+      "m": 8,
+      "d": "Add 2-3 Q&As — AI loves answering questions",
+      "icon": "❓"
+    },
+    {
+      "n": "Title Quality",
+      "s": 1,
+      "m": 8,
+      "d": "No valid title detected",
+      "icon": "📌"
+    },
+    {
+      "n": "Keyword Density",
+      "s": 8,
+      "m": 8,
+      "d": "\"link blog\" well covered (≥3x)",
+      "icon": "🔑"
+    },
+    {
+      "n": "Paragraph Length",
+      "s": 2,
+      "m": 6,
+      "d": "Adjust paragraph length",
+      "icon": "📏"
+    },
+    {
+      "n": "Sources",
+      "s": 6,
+      "m": 6,
+      "d": "46 traceable sources. Credible",
+      "icon": "📖"
+    },
+    {
+      "n": "CTA",
+      "s": 4,
+      "m": 4,
+      "d": "Has call-to-action",
+      "icon": "🎯"
+    },
+    {
+      "n": "Entity Info",
+      "s": 3,
+      "m": 8,
+      "d": "Has basic entity info",
+      "icon": "🏢"
+    },
+    {
+      "n": "EEAT",
+      "s": 4,
+      "m": 8,
+      "d": "Add experience/credentials/citations",
+      "icon": "🛡️"
+    },
+    {
+      "n": "Semantic Match",
+      "s": 0,
+      "m": 4,
+      "d": "Title and content intent mismatch",
+      "icon": "🔗"
+    },
+    {
+      "n": "Anti-AI Voice",
+      "s": 4,
+      "m": 4,
+      "d": "Clean human voice",
+      "icon": "🤖"
+    }
+  ],
+  "suggestions": [
+    {
+      "t": "fix",
+      "m": "Comparison low: Missing comparison — add contrasts"
+    },
+    {
+      "t": "fix",
+      "m": "FAQ Module low: Add 2-3 Q&As — AI loves answering questions"
+    },
+    {
+      "t": "fix",
+      "m": "Title Quality low: No valid title detected"
+    },
+    {
+      "t": "fix",
+      "m": "Paragraph Length low: Adjust paragraph length"
+    },
+    {
+      "t": "fix",
+      "m": "Entity Info low: Has basic entity info"
+    },
+    {
+      "t": "fix",
+      "m": "Semantic Match low: Title and content intent mismatch"
+    }
+  ],
+  "rewrite_hints": [
+    {
+      "action": "add_contrast",
+      "instruction": "Add at least one A vs B comparison. Use \"vs\", \"compared to\", \"rather than\", or numeric contrast (\"X is 3x more than Y\").",
+      "target_section": "any_paragraph",
+      "dimension": "Comparison",
+      "current": 2,
+      "max": 8,
+      "severity": 0.25
+    },
+    {
+      "action": "add_qa_section",
+      "instruction": "Add 2-3 Q&A pairs at the end. Format: \"Q: [question] A: [answer]\". Use questions real users would search for.",
+      "target_section": "end_of_content",
+      "dimension": "FAQ Module",
+      "current": 1,
+      "max": 8,
+      "severity": 0.125
+    },
+    {
+      "action": "rewrite_title",
+      "instruction": "Add a search-intent word (how/what/why/guide) AND a number to the title.",
+      "target_section": "title",
+      "dimension": "Title Quality",
+      "current": 1,
+      "max": 8,
+      "severity": 0.125
+    },
+    {
+      "action": "adjust_paragraphs",
+      "instruction": "Break long paragraphs (>200 chars) into 2-3 shorter ones. Each paragraph should express one complete thought.",
+      "target_section": "long_paragraphs",
+      "dimension": "Paragraph Length",
+      "current": 2,
+      "max": 6,
+      "severity": 0.3333333333333333
+    },
+    {
+      "action": "add_context",
+      "instruction": "Add a location name (city/province) and an organization/company name. Mention a specific time period or year.",
+      "target_section": "early_paragraphs",
+      "dimension": "Entity Info",
+      "current": 3,
+      "max": 8,
+      "severity": 0.375
+    },
+    {
+      "action": "align_title_body",
+      "instruction": "Make sure the body directly answers the question/claim in the title. Use the title keyword in the first paragraph.",
+      "target_section": "title_and_opening",
+      "dimension": "Semantic Match",
+      "current": 0,
+      "max": 4,
+      "severity": 0.0
+    }
+  ],
+  "voice_details": {
+    "ai_word_count": 1,
+    "ai_words_found": [
+      {
+        "signal": "banned_word",
+        "word": "to summarize",
+        "para": 1,
+        "detail": "Consider: rephrase in natural voice"
+      }
+    ],
+    "rlhf_signals": [],
+    "burstiness": 12.7,
+    "sentence_diversity": 1.0,
+    "sentence_count": 86,
+    "simple_declarative_pct": 0,
+    "opener_repeats": 0,
+    "repeated_openers": [],
+    "punctuation": {
+      "em_dash_count": 8,
+      "em_dash_per_500_chars": 0.4,
+      "semicolon_count": 3,
+      "curly_quote_count": 49,
+      "punct_score": 0.6
+    }
+  },
+  "stats": {
+    "textLength": 9955,
+    "paraCount": 1,
+    "avgParaLen": 9955,
+    "dataCount": 3
+  }
+}

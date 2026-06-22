@@ -1,0 +1,364 @@
+{
+  "title": "The Ultimate Guide to Productivity Hacks That Will Transform Your Life",
+  "total": 43,
+  "maxTotal": 100,
+  "pct": 43,
+  "raw_pct": 43,
+  "adaptive_pct": 43,
+  "grade": "C",
+  "dimensions": [
+    {
+      "n": "Conclusion-First",
+      "s": 6,
+      "m": 10,
+      "d": "Has intro but lead with answer next time",
+      "icon": "📍"
+    },
+    {
+      "n": "Data Anchors",
+      "s": 2,
+      "m": 10,
+      "d": "Add specific numbers and sources",
+      "icon": "📊"
+    },
+    {
+      "n": "Structure",
+      "s": 3,
+      "m": 8,
+      "d": "Add numbered steps or bullet points",
+      "icon": "🔢"
+    },
+    {
+      "n": "Comparison",
+      "s": 2,
+      "m": 8,
+      "d": "Missing comparison — add contrasts",
+      "icon": "⚖️"
+    },
+    {
+      "n": "FAQ Module",
+      "s": 8,
+      "m": 8,
+      "d": "4 Q&A pairs. Rich FAQ",
+      "icon": "❓"
+    },
+    {
+      "n": "Title Quality",
+      "s": 6,
+      "m": 8,
+      "d": "Good, add a number",
+      "icon": "📌"
+    },
+    {
+      "n": "Keyword Density",
+      "s": 6,
+      "m": 8,
+      "d": "\"productivity system\" appears 2x — aim for 3-5x",
+      "icon": "🔑"
+    },
+    {
+      "n": "Paragraph Length",
+      "s": 4,
+      "m": 6,
+      "d": "Paragraphs a bit long/short",
+      "icon": "📏"
+    },
+    {
+      "n": "Sources",
+      "s": 1,
+      "m": 6,
+      "d": "Add citations or data sources",
+      "icon": "📖"
+    },
+    {
+      "n": "CTA",
+      "s": 1,
+      "m": 4,
+      "d": "Add a CTA at the end",
+      "icon": "🎯"
+    },
+    {
+      "n": "Entity Info",
+      "s": 1,
+      "m": 8,
+      "d": "Add location and organization names",
+      "icon": "🏢"
+    },
+    {
+      "n": "EEAT",
+      "s": 2,
+      "m": 8,
+      "d": "Add experience/credentials/citations",
+      "icon": "🛡️"
+    },
+    {
+      "n": "Semantic Match",
+      "s": 0,
+      "m": 4,
+      "d": "Title and content intent mismatch",
+      "icon": "🔗"
+    },
+    {
+      "n": "Anti-AI Voice",
+      "s": 1,
+      "m": 4,
+      "d": "Mixed signals: 17 AI-tells, burstiness=4.3(low)",
+      "icon": "🤖"
+    }
+  ],
+  "suggestions": [
+    {
+      "t": "fix",
+      "m": "Data Anchors low: Add specific numbers and sources"
+    },
+    {
+      "t": "fix",
+      "m": "Structure low: Add numbered steps or bullet points"
+    },
+    {
+      "t": "fix",
+      "m": "Comparison low: Missing comparison — add contrasts"
+    },
+    {
+      "t": "fix",
+      "m": "Sources low: Add citations or data sources"
+    },
+    {
+      "t": "fix",
+      "m": "CTA low: Add a CTA at the end"
+    },
+    {
+      "t": "fix",
+      "m": "Entity Info low: Add location and organization names"
+    },
+    {
+      "t": "fix",
+      "m": "EEAT low: Add experience/credentials/citations"
+    },
+    {
+      "t": "fix",
+      "m": "Semantic Match low: Title and content intent mismatch"
+    },
+    {
+      "t": "fix",
+      "m": "Anti-AI Voice low: Mixed signals: 17 AI-tells, burstiness=4.3(low)"
+    }
+  ],
+  "rewrite_hints": [
+    {
+      "action": "add_numbers",
+      "instruction": "Add 2-3 specific numbers (% or counts or amounts) with units. Add 1-2 source citations or standard references.",
+      "target_section": "throughout",
+      "dimension": "Data Anchors",
+      "current": 2,
+      "max": 10,
+      "severity": 0.2
+    },
+    {
+      "action": "add_numbered_list",
+      "instruction": "Convert one section into a numbered list (3-5 items). Use \"1. / 2. / 3.\" or bullet points.",
+      "target_section": "middle_section",
+      "dimension": "Structure",
+      "current": 3,
+      "max": 8,
+      "severity": 0.375
+    },
+    {
+      "action": "add_contrast",
+      "instruction": "Add at least one A vs B comparison. Use \"vs\", \"compared to\", \"rather than\", or numeric contrast (\"X is 3x more than Y\").",
+      "target_section": "any_paragraph",
+      "dimension": "Comparison",
+      "current": 2,
+      "max": 8,
+      "severity": 0.25
+    },
+    {
+      "action": "add_citations",
+      "instruction": "Add at least 2 verifiable references. Mention specific studies, standards, reports, or link to source data.",
+      "target_section": "throughout",
+      "dimension": "Sources",
+      "current": 1,
+      "max": 6,
+      "severity": 0.16666666666666666
+    },
+    {
+      "action": "add_cta",
+      "instruction": "Add one call-to-action at the very end: \"Subscribe for more\", \"Contact me\", \"Try it yourself\", etc.",
+      "target_section": "end_of_content",
+      "dimension": "CTA",
+      "current": 1,
+      "max": 4,
+      "severity": 0.25
+    },
+    {
+      "action": "add_context",
+      "instruction": "Add a location name (city/province) and an organization/company name. Mention a specific time period or year.",
+      "target_section": "early_paragraphs",
+      "dimension": "Entity Info",
+      "current": 1,
+      "max": 8,
+      "severity": 0.125
+    },
+    {
+      "action": "add_credibility",
+      "instruction": "Add experience signal (\"X years in this field\") AND a credential or third-party validation reference.",
+      "target_section": "intro_or_body",
+      "dimension": "EEAT",
+      "current": 2,
+      "max": 8,
+      "severity": 0.25
+    },
+    {
+      "action": "align_title_body",
+      "instruction": "Make sure the body directly answers the question/claim in the title. Use the title keyword in the first paragraph.",
+      "target_section": "title_and_opening",
+      "dimension": "Semantic Match",
+      "current": 0,
+      "max": 4,
+      "severity": 0.0
+    },
+    {
+      "action": "remove_ai_tells",
+      "instruction": "6-signal check failed. Check: (1) banned vocabulary (delve/robust/furthermore etc.), (2) RLHF voice (\"Let me walk you through\"), (3) burstiness (vary sentence length), (4) punctuation (reduce em dashes/semicolons/curly quotes), (5) paragraph opener variety, (6) sentence structure diversity.",
+      "target_section": "throughout",
+      "dimension": "Anti-AI Voice",
+      "current": 1,
+      "max": 4,
+      "severity": 0.25
+    }
+  ],
+  "voice_details": {
+    "ai_word_count": 17,
+    "ai_words_found": [
+      {
+        "signal": "banned_word",
+        "word": "furthermore",
+        "para": 7,
+        "detail": "Consider: also / plus / what's more / on top of that"
+      },
+      {
+        "signal": "banned_word",
+        "word": "consequently",
+        "para": 7,
+        "detail": "Consider: so / as a result / that means / therefore"
+      },
+      {
+        "signal": "banned_word",
+        "word": "in conclusion",
+        "para": 9,
+        "detail": "Consider: bottom line / here's the thing / to wrap up"
+      },
+      {
+        "signal": "banned_word",
+        "word": "it is worth noting",
+        "para": 3,
+        "detail": "Consider: note this / keep in mind / here's the key"
+      },
+      {
+        "signal": "banned_word",
+        "word": "it is important to",
+        "para": 5,
+        "detail": "Consider: you need to / don't skip this / here's why it matters"
+      },
+      {
+        "signal": "banned_word",
+        "word": "delve",
+        "para": 3,
+        "detail": "Consider: explore / dig into / get into / examine"
+      },
+      {
+        "signal": "banned_word",
+        "word": "utilize",
+        "para": 7,
+        "detail": "Consider: use / apply / put to use"
+      },
+      {
+        "signal": "banned_word",
+        "word": "robust",
+        "para": 7,
+        "detail": "Consider: solid / reliable / proven / battle-tested"
+      },
+      {
+        "signal": "banned_word",
+        "word": "comprehensive",
+        "para": 3,
+        "detail": "Consider: thorough / complete / full / in-depth"
+      },
+      {
+        "signal": "banned_word",
+        "word": "streamline",
+        "para": 3,
+        "detail": "Consider: simplify / speed up / cut through / make faster"
+      },
+      {
+        "signal": "banned_word",
+        "word": "facilitate",
+        "para": 3,
+        "detail": "Consider: help / make possible / enable / ease"
+      },
+      {
+        "signal": "banned_word",
+        "word": "pivotal",
+        "para": 7,
+        "detail": "Consider: critical / key / central / game-changing"
+      },
+      {
+        "signal": "banned_word",
+        "word": "nuanced",
+        "para": 3,
+        "detail": "Consider: subtle / layered / complex / fine-grained"
+      },
+      {
+        "signal": "banned_word",
+        "word": "multifaceted",
+        "para": 9,
+        "detail": "Consider: complex / many-sided / layered"
+      },
+      {
+        "signal": "banned_word",
+        "word": "showcase",
+        "para": 5,
+        "detail": "Consider: show / display / highlight / put on display"
+      },
+      {
+        "signal": "banned_word",
+        "word": "a myriad of",
+        "para": 9,
+        "detail": "Consider: many / countless / dozens of / a range of"
+      },
+      {
+        "signal": "balanced_tradeoff",
+        "word": "On one hand, we have traditional approaches that emphasize time management. On the other",
+        "para": 5,
+        "detail": "\"On one hand X, on the other Y\" — balanced framing"
+      }
+    ],
+    "rlhf_signals": [
+      {
+        "signal": "balanced_tradeoff",
+        "word": "On one hand, we have traditional approaches that emphasize time management. On the other",
+        "para": 5,
+        "detail": "\"On one hand X, on the other Y\" — balanced framing"
+      }
+    ],
+    "burstiness": 4.3,
+    "sentence_diversity": 1.0,
+    "sentence_count": 15,
+    "simple_declarative_pct": 0,
+    "opener_repeats": 0,
+    "repeated_openers": [],
+    "punctuation": {
+      "em_dash_count": 0,
+      "em_dash_per_500_chars": 0.0,
+      "semicolon_count": 0,
+      "curly_quote_count": 0,
+      "punct_score": 1.0
+    }
+  },
+  "stats": {
+    "textLength": 1420,
+    "paraCount": 6,
+    "avgParaLen": 223,
+    "dataCount": 1
+  }
+}
