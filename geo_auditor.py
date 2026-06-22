@@ -1278,16 +1278,73 @@ def show_evolution_log() -> dict:
         })
     top_improvements.sort(key=lambda x: -x['total_gain'])
 
+    # ── Load current evolved weights (active detector adaptation) ──
+    active_weights = {}
+    evolution_history = []
+    seen_evolved_at = set()
+    try:
+        if os.path.exists(EVOLUTION_STATE):
+            with open(EVOLUTION_STATE, encoding='utf-8') as f:
+                state = json.load(f)
+            snap = state.get('latest_snapshot')
+            if snap and os.path.exists(snap):
+                with open(snap, encoding='utf-8') as f:
+                    snap_data = json.load(f)
+                    active_weights = snap_data.get('evolved_dim_weights', {})
+                    evolved_at = snap_data.get('_meta', {}).get('evolved_at', 'unknown')
+                    if evolved_at not in seen_evolved_at:
+                        seen_evolved_at.add(evolved_at)
+                        evolution_history.append({
+                            'evolved_at': evolved_at,
+                            'based_on': snap_data.get('_meta', {}).get('based_on', ''),
+                            'stale_count': sum(1 for w in active_weights.values() if w == 0),
+                            'proven_count': sum(1 for w in active_weights.values() if w == 0.5),
+                            'fragile_count': sum(1 for w in active_weights.values() if w == 1.0),
+                        })
+        # Also load all past snapshots for history
+        snap_dir = os.path.expanduser('~/.geo-auditor/snapshots')
+        if os.path.isdir(snap_dir):
+            for fname in sorted(os.listdir(snap_dir), reverse=True)[:10]:
+                if fname.endswith('.json') and fname.startswith('evolved_'):
+                    try:
+                        with open(os.path.join(snap_dir, fname), encoding='utf-8') as f:
+                            hist = json.load(f)
+                            w = hist.get('evolved_dim_weights', {})
+                            evolved_at = hist.get('_meta', {}).get('evolved_at', fname)
+                            if evolved_at not in seen_evolved_at:
+                                seen_evolved_at.add(evolved_at)
+                                evolution_history.append({
+                                    'evolved_at': evolved_at,
+                                    'based_on': hist.get('_meta', {}).get('based_on', ''),
+                                    'stale_count': sum(1 for v in w.values() if v == 0),
+                                    'proven_count': sum(1 for v in w.values() if v == 0.5),
+                                    'fragile_count': sum(1 for v in w.values() if v == 1.0),
+                                })
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    # ── Active weight breakdown ──
+    weight_status = {}
+    for dim, w in active_weights.items():
+        label = 'stale' if w == 0 else 'proven' if w == 0.5 else 'fragile'
+        weight_status[dim] = {'weight': w, 'status': label}
+
     return {
         'summary': {
             'total_detections': len(detections),
             'total_rewrites': len(rewrites),
             'tracking_since': entries[0]['ts'][:10] if entries else 'N/A',
             'overall_trend': 'improving' if rewrites and sum(r['delta_pct'] for r in rewrites) > 0 else 'stable',
+            'active_weights_loaded': len(active_weights) > 0,
+            'dimensions_adapted': len(active_weights),
         },
         'score_timeline': score_timeline,
-        'rewrite_timeline': rewrite_timeline[-20:],  # last 20 rewrites
+        'rewrite_timeline': rewrite_timeline[-20:],
         'top_improvements': top_improvements[:10],
+        'active_weights': weight_status,
+        'evolution_history': evolution_history[:5],  # last 5 evolutions
     }
 
 
@@ -1324,6 +1381,30 @@ def format_evolution_log(data: dict) -> str:
             recent_avg = round(sum(r['delta'] for r in recent) / len(recent), 1)
             out.append("")
             out.append(f"  💪 Recent rewrites: avg +{recent_avg}% improvement")
+
+    # ── Active detector adaptation ──
+    if data.get('active_weights'):
+        stale = {d: w for d, w in data['active_weights'].items() if w['status'] == 'stale'}
+        proven = {d: w for d, w in data['active_weights'].items() if w['status'] == 'proven'}
+        fragile = {d: w for d, w in data['active_weights'].items() if w['status'] == 'fragile'}
+        out.append("")
+        out.append("  🔄 Active Detector Adaptation:")
+        if stale:
+            out.append(f"     💤 Skipped (weight=0): {', '.join(stale.keys())}")
+        if proven:
+            out.append(f"     ✅ Relaxed (weight=0.5): {', '.join(proven.keys())}")
+        if fragile:
+            out.append(f"     ⚠️ Watching (weight=1.0): {', '.join(fragile.keys())}")
+    elif data.get('summary', {}).get('total_rewrites', 0) >= 5:
+        out.append("")
+        out.append("  💡 Tip: run --evolve to activate detector adaptation")
+
+    # ── Evolution history ──
+    if data.get('evolution_history'):
+        out.append("")
+        out.append("  📋 Evolution History:")
+        for ev in data['evolution_history']:
+            out.append(f"     {ev['evolved_at']}: {ev['based_on']} → {ev['stale_count']} stale, {ev['proven_count']} proven, {ev['fragile_count']} watching")
 
     return '\n'.join(out)
 
