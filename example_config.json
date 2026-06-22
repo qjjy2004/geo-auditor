@@ -1,0 +1,32 @@
+{
+  "_comment": "Example config for Agent-injected industry knowledge. Agent searches for industry standards, keywords, and patterns, then writes this config to inject into the detector.",
+  "keywords": [
+    "seismic bracing",
+    "抗震支架",
+    "GB50981",
+    "inspection",
+    "验收",
+    "torque",
+    "扭矩"
+  ],
+  "ref_patterns": [
+    "GB\\\\s*\\\\d+",
+    "JGJ\\\\s*\\\\d+",
+    "CECS\\\\s*\\\\d+",
+    "ISO\\\\s*\\\\d+",
+    "第\\\\d+\\\\.\\\\d+\\\\.\\\\d+条",
+    "检测报告",
+    "型式检验"
+  ],
+  "ai_waste": [
+    "furthermore",
+    "in conclusion",
+    "值得注意的是",
+    "综上所述"
+  ],
+  "ai_forbidden": [
+    "not.{0,15}but",
+    "不是.{0,15}而是"
+  ],
+  "data_units": "kN|MPa|N·m|mm|cm|吨|元|套|个|年|%"
+}
