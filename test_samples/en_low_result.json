@@ -1,10 +1,10 @@
 {
   "title": "The Ultimate Guide to Productivity Hacks That Will Transform Your Life",
-  "total": 43,
+  "total": 46,
   "maxTotal": 100,
-  "pct": 43,
-  "raw_pct": 43,
-  "adaptive_pct": 43,
+  "pct": 46,
+  "raw_pct": 46,
+  "adaptive_pct": 46,
   "grade": "C",
   "dimensions": [
     {
@@ -16,9 +16,9 @@
     },
     {
       "n": "Data Anchors",
-      "s": 2,
+      "s": 5,
       "m": 10,
-      "d": "Add specific numbers and sources",
+      "d": "2 data pts. Decent",
       "icon": "📊"
     },
     {
@@ -109,10 +109,6 @@
   "suggestions": [
     {
       "t": "fix",
-      "m": "Data Anchors low: Add specific numbers and sources"
-    },
-    {
-      "t": "fix",
       "m": "Structure low: Add numbered steps or bullet points"
     },
     {
@@ -145,15 +141,6 @@
     }
   ],
   "rewrite_hints": [
-    {
-      "action": "add_numbers",
-      "instruction": "Add 2-3 specific numbers (% or counts or amounts) with units. Add 1-2 source citations or standard references.",
-      "target_section": "throughout",
-      "dimension": "Data Anchors",
-      "current": 2,
-      "max": 10,
-      "severity": 0.2
-    },
     {
       "action": "add_numbered_list",
       "instruction": "Convert one section into a numbered list (3-5 items). Use \"1. / 2. / 3.\" or bullet points.",
@@ -359,6 +346,6 @@
     "textLength": 1420,
     "paraCount": 6,
     "avgParaLen": 223,
-    "dataCount": 1
+    "dataCount": 2
   }
 }

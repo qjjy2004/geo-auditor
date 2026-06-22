@@ -1,4 +1,15 @@
-# 本地测试产品
 *.pyc
 __pycache__/
 .DS_Store
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+venv/
+.venv/
+.idea/
+.vscode/
+*.swp
+*.swo
