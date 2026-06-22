@@ -400,6 +400,31 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     title = first_line if first_line and len(first_line) < 80 else ''
     body = '\n'.join(lines[1:]) if title else text
     ft = text
+    
+    # ── Sentence count for density-based scoring ──
+    _raw_sents = re.split(r'[.!?。！？\n]', body)
+    _raw_sents = [s.strip() for s in _raw_sents if len(s.strip()) > 10]
+    total_sents = len(_raw_sents)
+    
+    def _density_score(hits: int, bench_per_100: float, max_score: int, min_score: int = 1) -> int:
+        """Score based on hit density per 100 sentences. Diminishing returns above benchmark."""
+        if total_sents < 15:
+            # Very short text: fall back to absolute hits, scaled conservatively
+            # 1 hit = 25%, 2 = 50%, 3 = 75%, 4+ = cap
+            return max(min_score, min(max_score, round(max_score * min(1.0, hits / 4))))
+        
+        density = hits / total_sents * 100
+        
+        if density >= bench_per_100 * 2.5:
+            ratio = 0.95
+        elif density >= bench_per_100:
+            ratio = 0.65 + 0.30 * (density - bench_per_100) / bench_per_100
+        elif density >= bench_per_100 * 0.25:
+            ratio = 0.20 + 0.45 * (density - bench_per_100 * 0.25) / (bench_per_100 * 0.75)
+        else:
+            ratio = 0.20 * density / (bench_per_100 * 0.25)
+        
+        return max(min_score, round(max_score * ratio))
 
     dims = []
     total = 0
@@ -436,44 +461,36 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     dims.append({'n': 'Data Anchors', 's': da, 'm': 10, 'd': da_d, 'icon': '📊'})
     total += da
 
-    # 3. Structure / Steps 8
+    # 3. Structure / Steps 8 — density-based (bench: 12 hits/100 sentences)
     st = count_pattern(body, r'first|second|third|finally|step\s*\d|'
                        r'第[一二三四五六七八九十\d]|步骤|首先|然后|其次|最后|'
                        r'第一|第二|第三|\d+[\.、\)]\s*\S', re.IGNORECASE)
     bu = count_pattern(body, r'^[\-\*•]\s', re.MULTILINE)
     total_struct = st + bu
-    if total_struct >= 4: ss = 8
-    elif total_struct >= 2: ss = 6
-    elif total_struct >= 1: ss = 3
-    else: ss = 1
+    ss = _density_score(total_struct, bench_per_100=12, max_score=8)
     ss_d = (f'{st} steps + {bu} bullets. Well structured'
             if ss >= 7 else ('Has basic structure'
             if ss >= 4 else 'Add numbered steps or bullet points'))
     dims.append({'n': 'Structure', 's': ss, 'm': 8, 'd': ss_d, 'icon': '🔢'})
     total += ss
 
-    # 4. Comparison 8
+    # 4. Comparison 8 — density-based (bench: 6 hits/100 sentences)
     cm = count_pattern(ft, r'vs|versus|compared|unlike|differs|difference|'
                        r'better.than|worse.than|rather.than|instead.of|'
                        r'对比|相比|不同于|区别|差异|比.*更|而不是|而非|优于|不如', re.IGNORECASE)
     cm_num = count_pattern(ft, r'\d+\s*(?:%|degrees|times|years|days|倍|度).{0,30}'
                            r'\d+\s*(?:%|degrees|times|years|days|倍|度)')
     total_cm = cm + cm_num
-    if total_cm >= 3: cs = 8
-    elif total_cm >= 1: cs = 5
-    else: cs = 2
+    cs = _density_score(total_cm, bench_per_100=6, max_score=8, min_score=2)
     cs_d = (f'{total_cm} comparisons. Strong'
             if cs >= 7 else (f'{total_cm} comparison(s). Add more A vs B'
             if cs >= 4 else 'Missing comparison — add contrasts'))
     dims.append({'n': 'Comparison', 's': cs, 'm': 8, 'd': cs_d, 'icon': '⚖️'})
     total += cs
 
-    # 5. FAQ Module 8
+    # 5. FAQ Module 8 — density-based (bench: 8 hits/100 sentences)
     qa = count_pattern(body, r'Q[：:]\s|A[：:]\s|Q&A|FAQ|问[：:]|答[：:]|常见问题', re.IGNORECASE)
-    if qa >= 4: qs = 8
-    elif qa >= 2: qs = 6
-    elif qa >= 1: qs = 3
-    else: qs = 1
+    qs = _density_score(qa, bench_per_100=8, max_score=8)
     qs_d = (f'{qa} Q&A pairs. Rich FAQ'
             if qs >= 6 else ('Has Q&A elements'
             if qs >= 3 else 'Add 2-3 Q&As — AI loves answering questions'))
@@ -556,23 +573,21 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     dims.append({'n': 'Paragraph Length', 's': pl, 'm': 6, 'd': pl_d, 'icon': '📏'})
     total += pl
 
-    # 9. Sources 6
+    # 9. Sources 6 — density-based (bench: 18 hits/100 sentences)
     rf = sum(count_pattern(ft, p) for p in ref_patterns)
-    if rf >= 3: rs = 6
-    elif rf >= 1: rs = 4
-    else: rs = 1
+    rs = _density_score(rf, bench_per_100=18, max_score=6)
     rs_d = (f'{rf} traceable sources. Credible'
             if rs >= 5 else ('Has some sources — add more'
             if rs >= 3 else 'Add citations or data sources'))
     dims.append({'n': 'Sources', 's': rs, 'm': 6, 'd': rs_d, 'icon': '📖'})
     total += rs
 
-    # 10. CTA 4
+    # 10. CTA 4 — density-based (bench: 12 hits/100 sentences)
     ct = count_pattern(ft, r'subscribe|follow|share|comment|contact|reach.out|try|'
                        r'sign.up|download|learn.more|get.started|'
                        r'私信|联系|咨询|关注|扫描|点击|评论|加微信|打电话|聊聊', re.IGNORECASE)
-    cc = 4 if ct >= 1 else 1
-    cc_d = 'Has call-to-action' if ct >= 1 else 'Add a CTA at the end'
+    cc = _density_score(ct, bench_per_100=12, max_score=4)
+    cc_d = 'Has call-to-action' if cc >= 3 else 'Add a CTA at the end'
     dims.append({'n': 'CTA', 's': cc, 'm': 4, 'd': cc_d, 'icon': '🎯'})
     total += cc
 
