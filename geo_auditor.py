@@ -1055,8 +1055,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
     detections = [e for e in entries if e.get('type') != 'rewrite']
 
     if corrupt_lines > 0:
-        import sys as _sys
-        print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log", file=_sys.stderr)
+        print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log", file=sys.stderr)
 
     if len(rewrites) < min_entries:
         return {
@@ -1176,6 +1175,9 @@ def show_evolution_log() -> dict:
                         corrupt_lines += 1
     except FileNotFoundError:
         return {'error': 'No evolution log found.'}
+
+    if corrupt_lines > 0:
+        print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log", file=sys.stderr)
 
     rewrites = [e for e in entries if e.get('type') == 'rewrite']
     detections = [e for e in entries if e.get('type') != 'rewrite']
@@ -1662,7 +1664,7 @@ Config file format (geo_auditor.json):
     if args.evolve or args.agent_prompt:
         result = evolve_detector()
         if args.agent_prompt:
-            print(generate_agent_prompt(result))
+            _safe_print(generate_agent_prompt(result))
             return
         # Inject agent prompt into JSON output
         result['agent_prompt'] = generate_agent_prompt(result)
@@ -1755,11 +1757,11 @@ Config file format (geo_auditor.json):
     log_detection(result, args.config)
 
     if args.rewrite_prompt:
-        print(generate_rewrite_prompt(content, result))
+        _safe_print(generate_rewrite_prompt(content, result))
     elif args.json:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _safe_print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        print(format_output(result))
+        _safe_print(format_output(result))
 
 
 if __name__ == '__main__':
