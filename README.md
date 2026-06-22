@@ -3,6 +3,8 @@
 [![Version](https://img.shields.io/badge/version-v0.6.6-blue)](https://github.com/qjjy2004/geo-auditor/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.7%2B-blue)](https://www.python.org/)
+[![Test](https://github.com/qjjy2004/geo-auditor/actions/workflows/test.yml/badge.svg)](https://github.com/qjjy2004/geo-auditor/actions/workflows/test.yml)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/qjjy2004/geo-auditor)
 
 **Not just a detector. A self-evolving system that trains your AI Agent to write better.**
 
@@ -127,6 +129,37 @@ python3 geo_auditor.py --help
 
 # Web: open geo-auditor.html in browser
 ```
+
+## Quick Start
+
+```bash
+# Score a file
+python3 geo_auditor.py --file draft.md
+
+# Score text directly
+python3 geo_auditor.py "Your content here" --json
+
+# Compare before/after (this also trains the evolution engine)
+python3 geo_auditor.py --compare v1.md v2.md
+
+# Export writing rules for your AI Agent
+python3 geo_auditor.py --agent-prompt
+```
+
+## FAQ
+
+**Is my content sent anywhere?** No. Zero network calls. Everything runs locally.
+
+**What's different from GPTZero / Originality.ai?** They detect AI-generated text. GEO Auditor measures **AI search citation quality** — content that scores well is optimized for being cited by AI search engines (豆包, DeepSeek, ChatGPT).
+
+**Why zero dependencies?** You should be able to run it anywhere without `pip install`. Python 3.7+ stdlib only.
+
+## Roadmap
+
+- `v0.7` — Multi-file batch analysis
+- `v0.8` — Browser extension (one-click audit for any webpage)
+- `v0.9` — Markdown export with inline annotations
+- `v1.0` — Stable API + documented plugin system
 
 ## License
 
