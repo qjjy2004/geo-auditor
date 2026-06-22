@@ -33,6 +33,8 @@ python3 geo_auditor.py --rewrite-prompt               # LLM rewrite suggestions
 
 14 dimensions, 6-signal Anti-AI Voice, bilingual (EN+CN). Zero dependencies.
 
+**Note on HTML vs CLI:** The web version (`geo-auditor.html`) provides a simplified detection experience for quick checks. Its Anti-AI Voice engine uses a subset of the full 6-signal system (focusing on banned vocabulary + RLHF patterns). The CLI version is the authoritative engine — it includes burstiness analysis, sentence diversity scoring, paragraph opener repetition, and punctuation fingerprinting that the HTML version omits for simplicity. For Agent training and evolution features, always use the CLI.
+
 ### 2. As an Agent Trainer (Evolution System)
 
 ```bash

@@ -137,8 +137,8 @@ footer a { color: var(--ac); text-decoration: none; }
   </header>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('check')">Check</button>
-    <button class="tab" onclick="showTab('history')">History</button>
+    <button class="tab active" onclick="showTab('check', event)">Check</button>
+    <button class="tab" onclick="showTab('history', event)">History</button>
   </div>
 
   <div id="checkPanel">
@@ -552,9 +552,9 @@ function clearInput() {
 }
 
 // ── Tabs ──
-function showTab(t) {
+function showTab(t, evt) {
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (evt) evt.target.classList.add('active');
   document.getElementById('checkPanel').style.display = t === 'check' ? 'block' : 'none';
   document.getElementById('historyPanel').style.display = t === 'history' ? 'block' : 'none';
   if (t === 'history') loadHistory();

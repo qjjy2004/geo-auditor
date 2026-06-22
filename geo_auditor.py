@@ -30,7 +30,7 @@ import argparse
 from collections import Counter
 from typing import Optional
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 # ════════════════════════════════════
 # Default patterns (can be overridden via --config)
@@ -46,10 +46,10 @@ DEFAULT_ENTITY_PATTERNS = [
 ]
 
 DEFAULT_AI_FORBIDDEN = [
-    re.compile(r'not.{0,15}but'),
-    re.compile(r"isn't.{0,10}it's"),
-    re.compile(r'not only.{0,10}but also'),
-    re.compile(r'it.{0,10}goes without saying'),
+    re.compile(r'not.{0,15}but', re.IGNORECASE),
+    re.compile(r"isn't.{0,10}it's", re.IGNORECASE),
+    re.compile(r'not only.{0,10}but also', re.IGNORECASE),
+    re.compile(r'it.{0,10}goes without saying', re.IGNORECASE),
     re.compile(r'不是.{0,15}而是'),
     re.compile(r'并非.{0,10}而是'),
     re.compile(r'不仅是.{0,10}更是'),
@@ -135,9 +135,9 @@ AI_ALTERNATIVES = {
 }
 
 DEFAULT_REF_PATTERNS = [
-    r'reference|source|citation|according.to|study|survey|'
-    r'published|reported|data.from|verified.by|link|'
-    r'参考|来源|引用|据.*显示|检测报告|调查|研究表明',
+    re.compile(r'reference|source|citation|according.to|study|survey|'
+               r'published|reported|data.from|verified.by|link|'
+               r'参考|来源|引用|据.*显示|检测报告|调查|研究表明'),
 ]
 
 DEFAULT_DATA_UNITS = (
@@ -156,7 +156,7 @@ class Config:
         self.ai_forbidden = [re.compile(p) for p in d.get('ai_forbidden', [])]
         self.ai_waste = d.get('ai_waste', [])
         self.rlhf_signals = d.get('rlhf_signals', [])  # Agent-injected RLHF patterns
-        self.ref_patterns = d.get('ref_patterns', [])
+        self.ref_patterns = [re.compile(p) for p in d.get('ref_patterns', [])]
         self.data_units = d.get('data_units', '')
 
     @property
@@ -180,7 +180,8 @@ class Config:
         return self.ref_patterns if self.ref_patterns else DEFAULT_REF_PATTERNS
 
     def data_units_or_default(self):
-        return self.data_units if self.data_units else DEFAULT_DATA_UNITS
+        units = self.data_units.strip() if self.data_units else ''
+        return units if units else DEFAULT_DATA_UNITS
 
 
 def count_pattern(text: str, pattern) -> int:
@@ -220,6 +221,14 @@ def extract_topic_phrases(text: str, top_n: int = 5) -> list:
             for chunk, count in seen.items():
                 if count >= 2:
                     candidates.append((chunk, count))
+    # Filter substring overlaps: longer n-grams take priority
+    if is_cn:
+        filtered = []
+        candidates.sort(key=lambda x: (-len(x[0]), -x[1]))
+        for phrase, count in candidates:
+            if not any(phrase in other and phrase != other for other, _ in filtered):
+                filtered.append((phrase, count))
+        candidates = filtered
     else:
         words = clean.split()
         if len(words) >= 3:
@@ -239,8 +248,7 @@ def extract_topic_phrases(text: str, top_n: int = 5) -> list:
 
 def generate_rewrite_hint(dim_name: str, score: int, max_score: int, detail: str) -> dict:
     """Generate structured, actionable rewrite instruction for Agent"""
-    ratio = score / max_score
-    base = {'dimension': dim_name, 'current': score, 'max': max_score, 'severity': ratio}
+    ratio = score / max_score if max_score > 0 else 0
 
     hints = {
         'Conclusion-First': {
@@ -356,7 +364,8 @@ def detect(text: str, config: Config = None) -> dict:
     data_units = config.data_units_or_default()
 
     lines = text.split('\n')
-    title = lines[0] if len(lines[0]) < 80 else ''
+    first_line = lines[0].strip()
+    title = first_line if first_line and len(first_line) < 80 else ''
     body = '\n'.join(lines[1:]) if title else text
     ft = text
 
@@ -381,8 +390,12 @@ def detect(text: str, config: Config = None) -> dict:
     nm = count_pattern(ft, rf'\d+\.?\d*\s*(?:{data_units})')
     sm = sum(count_pattern(ft, p) for p in ref_patterns)
     if nm >= 4 and sm >= 2: da = 10
+    elif nm >= 3 and sm >= 1: da = 8
     elif nm >= 3: da = 7
+    elif nm >= 2 and sm >= 1: da = 6
     elif nm >= 2: da = 5
+    elif sm >= 3: da = 4  # Sources without numbers still have value
+    elif sm >= 1: da = 3
     elif nm >= 1: da = 2
     else: da = 0
     da_d = (f'{nm} data pts + {sm} refs. Excellent'
@@ -657,19 +670,25 @@ def detect(text: str, config: Config = None) -> dict:
     punct_score = max(0.0, punct_score)
 
     # ── Score synthesis (6 signals) ──
-    deai = 4
-    if ai_hits > 5: deai -= 2
-    elif ai_hits > 2: deai -= 1
-    if burstiness < 5 and len(sent_lengths) >= 4: deai -= 1  # SD < 5 words = metronomic
-    if sent_diversity < 0.5: deai -= 1
-    if opener_repeats > 2: deai -= 1
-    if punct_score < 0.4: deai -= 1
+    # Short/empty text cannot be reliably judged — cap max score
+    if len(sents) < 4 or len(body.strip()) < 80:
+        # Insufficient signal: cap at 3/4, note uncertainty
+        deai = 3 if len(sents) >= 1 else 2
+    else:
+        deai = 4
+        if ai_hits > 5: deai -= 2
+        elif ai_hits > 2: deai -= 1
+        if burstiness < 5 and len(sent_lengths) >= 4: deai -= 1  # SD < 5 words = metronomic
+        if sent_diversity < 0.5: deai -= 1
+        if opener_repeats > 2: deai -= 1
+        if punct_score < 0.4: deai -= 1
     deai = max(0, deai)
 
     # Diagnosis string
     reasons = []
     if ai_hits > 0: reasons.append(f'{ai_hits} AI-tells')
-    if burstiness > 0 and burstiness < 5: reasons.append(f'burstiness={burstiness}(low)')
+    if burstiness < 5 and len(sent_lengths) >= 4:
+        reasons.append(f'burstiness={burstiness}(low)' if burstiness > 0 else 'burstiness=0(uniform)')
     if sent_diversity < 0.7: reasons.append(f'diversity={sent_diversity}')
     if opener_repeats > 0: reasons.append(f'{opener_repeats} repeated openers')
     if punct_score < 0.7: reasons.append(f'punct={punct_score}')
@@ -845,7 +864,6 @@ def analyze_history(results: list) -> dict:
             'scores': [r['pct'] for r in results],
         }
     }
-    return analysis
 
 
 def learn_from_history(results: list) -> dict:
@@ -941,8 +959,7 @@ SNAPSHOT_DIR = os.path.join(EVOLUTION_DIR, 'snapshots')
 def log_detection(result: dict, config_path: str = None):
     """Auto-log each detection for evolution tracking. Non-blocking, silent failure."""
     try:
-        if not os.path.isdir(EVOLUTION_DIR):
-            return
+        os.makedirs(EVOLUTION_DIR, exist_ok=True)
         entry = {
             'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'score': result['pct'],
@@ -951,7 +968,7 @@ def log_detection(result: dict, config_path: str = None):
             'voice': result.get('voice_details', {}).get('ai_word_count', 0),
             'config': config_path,
         }
-        with open(EVOLUTION_LOG, 'a') as f:
+        with open(EVOLUTION_LOG, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     except Exception:
         pass  # Never fail the main task for logging
@@ -960,8 +977,7 @@ def log_detection(result: dict, config_path: str = None):
 def log_compare(before: dict, after: dict, cmp: dict):
     """Log a rewrite comparison — the core learning signal."""
     try:
-        if not os.path.isdir(EVOLUTION_DIR):
-            return
+        os.makedirs(EVOLUTION_DIR, exist_ok=True)
         entry = {
             'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'type': 'rewrite',
@@ -972,7 +988,7 @@ def log_compare(before: dict, after: dict, cmp: dict):
             'worsened': [d['dimension'] for d in cmp['dimension_deltas'] if d['worsened']],
             'gains': {d['dimension']: d['delta'] for d in cmp['dimension_deltas'] if d['delta'] != 0},
         }
-        with open(EVOLUTION_LOG, 'a') as f:
+        with open(EVOLUTION_LOG, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     except Exception:
         pass
@@ -982,12 +998,16 @@ def evolve_detector(min_entries: int = 5) -> dict:
     """Analyze evolution log and produce an evolved config.
     Learns from rewrite experiences: which fixes actually worked."""
     entries = []
+    corrupt_lines = 0
     try:
-        with open(EVOLUTION_LOG) as f:
+        with open(EVOLUTION_LOG, encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    entries.append(json.loads(line))
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        corrupt_lines += 1
     except FileNotFoundError:
         return {'error': f'No evolution log found. Run detections first.'}
 
@@ -1099,12 +1119,16 @@ def evolve_detector(min_entries: int = 5) -> dict:
 def show_evolution_log() -> dict:
     """Display the detector's own growth trajectory"""
     entries = []
+    corrupt_lines = 0
     try:
-        with open(EVOLUTION_LOG) as f:
+        with open(EVOLUTION_LOG, encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    entries.append(json.loads(line))
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        corrupt_lines += 1
     except FileNotFoundError:
         return {'error': 'No evolution log found.'}
 
@@ -1430,13 +1454,15 @@ def format_compare(cmp: dict) -> str:
 
 def format_history(analysis: dict) -> str:
     """Human-readable history analysis output"""
+    if 'error' in analysis:
+        return f"Analysis error: {analysis['error']}"
     out = []
     out.append("╔══════════════════════════════════╗")
     out.append("║  GEO Auditor — Agent Learning    ║")
     out.append("╠══════════════════════════════════╣")
-    st = analysis['score_trend']
-    delta_str = f"+{st['delta']}" if st['delta'] >= 0 else str(st['delta'])
-    out.append(f"║  {st['first']}% → {st['last']}%  ({delta_str}%) over {analysis['results_count']} checks  ║")
+    st = analysis.get('score_trend', {})
+    delta_str = f"+{st.get('delta', 0)}" if st.get('delta', 0) >= 0 else str(st.get('delta', 0))
+    out.append(f"║  {st.get('first', '?')}% → {st.get('last', '?')}%  ({delta_str}%) over {analysis.get('results_count', 0)} checks  ║")
     out.append("╚══════════════════════════════════╝")
     out.append("")
 
@@ -1614,14 +1640,22 @@ Config file format (geo_auditor.json):
     # ── Compare mode ──
     if args.compare:
         f1, f2 = args.compare
-        with open(f1, 'r', encoding='utf-8') as f:
-            c1 = f.read()
-        with open(f2, 'r', encoding='utf-8') as f:
-            c2 = f.read()
+        try:
+            with open(f1, 'r', encoding='utf-8') as f:
+                c1 = f.read()
+            with open(f2, 'r', encoding='utf-8') as f:
+                c2 = f.read()
+        except FileNotFoundError as e:
+            print(f"Error: file not found — {e}", file=sys.stderr)
+            sys.exit(1)
         config = Config()
         if args.config:
-            with open(args.config, 'r', encoding='utf-8') as f:
-                config = Config(json.load(f))
+            try:
+                with open(args.config, 'r', encoding='utf-8') as f:
+                    config = Config(json.load(f))
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                print(f"Error loading config: {e}", file=sys.stderr)
+                sys.exit(1)
         r1 = detect(c1, config)
         r2 = detect(c2, config)
         cmp = compare_results(r1, r2)
@@ -1657,8 +1691,15 @@ Config file format (geo_auditor.json):
 
     config = Config()
     if args.config:
-        with open(args.config, 'r', encoding='utf-8') as f:
-            config = Config(json.load(f))
+        try:
+            with open(args.config, 'r', encoding='utf-8') as f:
+                config = Config(json.load(f))
+        except FileNotFoundError as e:
+            print(f"Error: config file not found — {e}", file=sys.stderr)
+            sys.exit(1)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid config JSON — {e}", file=sys.stderr)
+            sys.exit(1)
 
     result = detect(content, config)
     log_detection(result, args.config)
