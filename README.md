@@ -1,5 +1,9 @@
 # GEO Auditor · The Agent's Evolving Writing Brain
 
+[![Version](https://img.shields.io/badge/version-v0.6.6-blue)](https://github.com/qjjy2004/geo-auditor/releases)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.7%2B-blue)](https://www.python.org/)
+
 **Not just a detector. A self-evolving system that trains your AI Agent to write better.**
 
 ---
