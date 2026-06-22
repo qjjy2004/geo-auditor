@@ -1071,7 +1071,7 @@ def log_compare(before: dict, after: dict, cmp: dict):
         pass
 
 
-def evolve_detector(min_entries: int = 5, recent_window: int = 30) -> dict:
+def evolve_detector(recent_window: int = 30) -> dict:
     """Analyze evolution log and produce evolved dimension weights.
     
     v0.6.3 refactor (GPT audit): Learns from BOTH detection scores AND rewrite outcomes.
