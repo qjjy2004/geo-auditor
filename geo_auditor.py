@@ -44,6 +44,8 @@ def _safe_print(*args, **kwargs):
             '🛡️': '[EEAT]', '🤖': '[AI]', '🏆': '[S]', '✅': '[OK]',
             '⚠️': '[WARN]', '❌': '[FAIL]', '📈': '[UP]', '📉': '[DOWN]',
             '➡️': '->', '💡': 'TIP:', '▶': '>', '💪': 'STRONG:',
+            '💤': '[STALE]', '🔄': '[ADAPT]', '🔧': '[FIX]',
+            '📝': '[TPL]', '👀': '[WATCH]',
             '░': '.', '█': '#', '═': '=', '╔': '+', '╗': '+',
             '║': '|', '╚': '+', '╝': '+', '╠': '+', '╣': '+',
             '─': '-', '↑': 'UP', '↓': 'DOWN', '→': '->',
@@ -163,7 +165,7 @@ AI_ALTERNATIVES = {
 DEFAULT_REF_PATTERNS = [
     re.compile(r'reference|source|citation|according.to|study|survey|'
                r'published|reported|data.from|verified.by|link|'
-               r'参考|来源|引用|据.*显示|检测报告|调查|研究表明'),
+               r'参考|来源|引用|据.*显示|检测报告|调查|研究表明', re.IGNORECASE),
 ]
 
 DEFAULT_DATA_UNITS = (
@@ -210,8 +212,8 @@ class Config:
         return units if units else DEFAULT_DATA_UNITS
 
 
-def count_pattern(text: str, pattern) -> int:
-    return len(re.findall(pattern, text))
+def count_pattern(text: str, pattern, flags: int = 0) -> int:
+    return len(re.findall(pattern, text, flags))
 
 
 def count_keyword(text: str, keyword: str) -> int:
@@ -438,8 +440,8 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # 3. Structure / Steps 8
     st = count_pattern(body, r'first|second|third|finally|step\s*\d|'
                        r'第[一二三四五六七八九十\d]|步骤|首先|然后|其次|最后|'
-                       r'第一|第二|第三|\d+[\.、\)]\s*\S')
-    bu = count_pattern(body, r'^[\-\*•]\s')
+                       r'第一|第二|第三|\d+[\.、\)]\s*\S', re.IGNORECASE)
+    bu = count_pattern(body, r'^[\-\*•]\s', re.MULTILINE)
     total_struct = st + bu
     if total_struct >= 4: ss = 8
     elif total_struct >= 2: ss = 6
@@ -454,7 +456,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # 4. Comparison 8
     cm = count_pattern(ft, r'vs|versus|compared|unlike|differs|difference|'
                        r'better.than|worse.than|rather.than|instead.of|'
-                       r'对比|相比|不同于|区别|差异|比.*更|而不是|而非|优于|不如')
+                       r'对比|相比|不同于|区别|差异|比.*更|而不是|而非|优于|不如', re.IGNORECASE)
     cm_num = count_pattern(ft, r'\d+\s*(?:%|degrees|times|years|days|倍|度).{0,30}'
                            r'\d+\s*(?:%|degrees|times|years|days|倍|度)')
     total_cm = cm + cm_num
@@ -468,7 +470,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     total += cs
 
     # 5. FAQ Module 8
-    qa = count_pattern(body, r'Q[：:]\s|A[：:]\s|Q&A|FAQ|问[：:]|答[：:]|常见问题')
+    qa = count_pattern(body, r'Q[：:]\s|A[：:]\s|Q&A|FAQ|问[：:]|答[：:]|常见问题', re.IGNORECASE)
     if qa >= 4: qs = 8
     elif qa >= 2: qs = 6
     elif qa >= 1: qs = 3
@@ -483,7 +485,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     hk = len(title) > 0
     hi = bool(re.search(r'how|what|why|which|when|where|who|guide|tutorial|tips|'
                         r'怎么|如何|什么|哪|为什么|多少|吗|教程|指南|攻略|方法|技巧|案例',
-                        title))
+                        title, re.IGNORECASE))
     hn = bool(re.search(r'\d', title))
     if hk and hi and hn: tq = 8
     elif hk and hi: tq = 6
@@ -569,7 +571,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # 10. CTA 4
     ct = count_pattern(ft, r'subscribe|follow|share|comment|contact|reach.out|try|'
                        r'sign.up|download|learn.more|get.started|'
-                       r'私信|联系|咨询|关注|扫描|点击|评论|加微信|打电话|聊聊')
+                       r'私信|联系|咨询|关注|扫描|点击|评论|加微信|打电话|聊聊', re.IGNORECASE)
     cc = 4 if ct >= 1 else 1
     cc_d = 'Has call-to-action' if ct >= 1 else 'Add a CTA at the end'
     dims.append({'n': 'CTA', 's': cc, 'm': 4, 'd': cc_d, 'icon': '🎯'})
@@ -663,7 +665,13 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # ── Signal D: Sentence diversity + burstiness ──
     sents = re.split(r'[.!?。！？\n]', body)
     sents = [s.strip() for s in sents if len(s.strip()) > 10]
-    sent_lengths = [len(s.split()) for s in sents]  # word counts per sentence
+    # Detect CJK-dominant text: use character count for burstiness (Chinese has no spaces)
+    cjk_chars = sum(1 for c in body if '\u4e00' <= c <= '\u9fff')
+    is_cjk = cjk_chars > len(body) * 0.3
+    if is_cjk:
+        sent_lengths = [len(s) for s in sents]  # character counts per sentence
+    else:
+        sent_lengths = [len(s.split()) for s in sents]  # word counts per sentence
 
     # Burstiness: std dev of sentence length (humans = high variance, AI = uniform)
     burstiness = 0.0
@@ -672,8 +680,11 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
         variance = sum((l - mean_len) ** 2 for l in sent_lengths) / len(sent_lengths)
         burstiness = round(math.sqrt(variance), 1)
 
-    # Simple declarative ratio
-    simple_decl = sum(1 for s in sents if re.match(r'^.{0,5}(是|is|are|was|were)\b', s))
+    # Simple declarative ratio (CJK-aware: no word boundary for Chinese)
+    if is_cjk:
+        simple_decl = sum(1 for s in sents if re.match(r'^.{0,5}(是)', s))
+    else:
+        simple_decl = sum(1 for s in sents if re.match(r'^.{0,5}(is|are|was|were)\\b', s))
     sent_diversity = 1.0
     if len(sents) >= 4:
         simple_ratio = simple_decl / len(sents)
@@ -1040,7 +1051,7 @@ def log_detection(result: dict, config_path: str = None):
             'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'score': result['pct'],
             'grade': result['grade'],
-            'dims': {d['n']: d['s'] for d in result['dimensions']},
+            'dimensions': [{'n': d['n'], 's': d['s'], 'm': d['m']} for d in result['dimensions']],
             'voice': result.get('voice_details', {}).get('ai_word_count', 0),
             'config': config_path,
         }
