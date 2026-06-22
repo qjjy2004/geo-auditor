@@ -126,4 +126,4 @@ python3 geo_auditor.py --help
 
 ## License
 
-MIT · 良佳科技 · [zhibi.xyz](https://zhibi.xyz)
+MIT · zhibi · [zhibi.xyz](https://zhibi.xyz)
