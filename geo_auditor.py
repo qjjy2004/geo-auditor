@@ -1168,15 +1168,6 @@ def evolve_detector(min_entries: int = 5) -> dict:
         'skip_hints': [sd['dimension'] for sd in stale_dims],
     }
 
-    # ── Save snapshot ──
-    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
-    snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
-    try:
-        with open(snapshot_path, 'w', encoding='utf-8') as f:
-            json.dump(evolved, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
     # ── Build evolved dimension weights for detection feedback loop ──
     # stale_dims → weight 0 (skip — never improves, noise only)
     # proven_fixes → weight 0.5 (Agent has internalized — reduce scrutiny)
@@ -1191,7 +1182,16 @@ def evolve_detector(min_entries: int = 5) -> dict:
         evolved_dim_weights[ff['dimension']] = 1.0
     evolved['evolved_dim_weights'] = evolved_dim_weights
 
-    # ── Update evolution state ──
+    # ── Save snapshot (after weights are built — v0.6.3 fix) ──
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
+    try:
+        with open(snapshot_path, 'w', encoding='utf-8') as f:
+            json.dump(evolved, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    # ── Update evolution state (include weights directly — v0.6.3 fix) ──
     try:
         os.makedirs(os.path.dirname(EVOLUTION_STATE), exist_ok=True)
         with open(EVOLUTION_STATE, 'w', encoding='utf-8') as f:
@@ -1201,6 +1201,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
                 'total_detections': len(detections),
                 'proven_fixes_count': len(proven_fixes),
                 'latest_snapshot': snapshot_path,
+                'evolved_dim_weights': evolved_dim_weights,
             }, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
@@ -1847,11 +1848,15 @@ Config file format (geo_auditor.json):
                 import json as _json
                 with open(evolved_state_path, encoding='utf-8') as _f:
                     state = _json.load(_f)
-                snap = state.get('latest_snapshot')
-                if snap and os.path.exists(snap):
-                    with open(snap, encoding='utf-8') as _f:
-                        snap_data = _json.load(_f)
-                        cmp_evolved = snap_data.get('evolved_dim_weights', {})
+                # v0.6.3: read weights directly (they're now stored in state)
+                cmp_evolved = state.get('evolved_dim_weights', {})
+                if not cmp_evolved:
+                    # Fallback: try snapshot for pre-0.6.3 compatibility
+                    snap = state.get('latest_snapshot')
+                    if snap and os.path.exists(snap):
+                        with open(snap, encoding='utf-8') as _f:
+                            snap_data = _json.load(_f)
+                            cmp_evolved = snap_data.get('evolved_dim_weights', {})
         except Exception:
             pass
         r1 = detect(c1, config, cmp_evolved)
@@ -1911,12 +1916,15 @@ Config file format (geo_auditor.json):
             import json as _json
             with open(evolved_state_path, encoding='utf-8') as _f:
                 state = _json.load(_f)
-            # Load from latest snapshot if exists
-            snap = state.get('latest_snapshot')
-            if snap and os.path.exists(snap):
-                with open(snap, encoding='utf-8') as _f:
-                    snap_data = _json.load(_f)
-                    evolved_weights = snap_data.get('evolved_dim_weights', {})
+            # v0.6.3: read weights directly (they're now stored in state)
+            evolved_weights = state.get('evolved_dim_weights', {})
+            if not evolved_weights:
+                # Fallback: try snapshot for pre-0.6.3 compatibility
+                snap = state.get('latest_snapshot')
+                if snap and os.path.exists(snap):
+                    with open(snap, encoding='utf-8') as _f:
+                        snap_data = _json.load(_f)
+                        evolved_weights = snap_data.get('evolved_dim_weights', {})
     except Exception:
         pass
 
