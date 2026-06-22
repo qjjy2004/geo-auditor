@@ -24,6 +24,8 @@ import re
 import sys
 import json
 import math
+import os
+import time
 import argparse
 from collections import Counter
 from typing import Optional
@@ -925,6 +927,326 @@ def learn_from_history(results: list) -> dict:
     }
 
 
+# ══════════════════════════════════════════════════════════
+# Self-Evolution System
+# Modeled after Hermes' learning loop: detect → rewrite → compare → learn
+# Stores rewrite experiences, not just detection scores
+# ══════════════════════════════════════════════════════════
+EVOLUTION_DIR = os.path.expanduser('~/.geo-auditor')
+EVOLUTION_LOG = os.path.join(EVOLUTION_DIR, 'evolution.jsonl')
+EVOLUTION_STATE = os.path.join(EVOLUTION_DIR, 'evolution_state.json')
+SNAPSHOT_DIR = os.path.join(EVOLUTION_DIR, 'snapshots')
+
+
+def log_detection(result: dict, config_path: str = None):
+    """Auto-log each detection for evolution tracking. Non-blocking, silent failure."""
+    try:
+        if not os.path.isdir(EVOLUTION_DIR):
+            return
+        entry = {
+            'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'score': result['pct'],
+            'grade': result['grade'],
+            'dims': {d['n']: d['s'] for d in result['dimensions']},
+            'voice': result.get('voice_details', {}).get('ai_word_count', 0),
+            'config': config_path,
+        }
+        with open(EVOLUTION_LOG, 'a') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    except Exception:
+        pass  # Never fail the main task for logging
+
+
+def log_compare(before: dict, after: dict, cmp: dict):
+    """Log a rewrite comparison — the core learning signal."""
+    try:
+        if not os.path.isdir(EVOLUTION_DIR):
+            return
+        entry = {
+            'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'type': 'rewrite',
+            'delta_pct': cmp['delta_pct'],
+            'before_score': before['pct'],
+            'after_score': after['pct'],
+            'improved': [d['dimension'] for d in cmp['dimension_deltas'] if d['improved']],
+            'worsened': [d['dimension'] for d in cmp['dimension_deltas'] if d['worsened']],
+            'gains': {d['dimension']: d['delta'] for d in cmp['dimension_deltas'] if d['delta'] != 0},
+        }
+        with open(EVOLUTION_LOG, 'a') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    except Exception:
+        pass
+
+
+def evolve_detector(min_entries: int = 5) -> dict:
+    """Analyze evolution log and produce an evolved config.
+    Learns from rewrite experiences: which fixes actually worked."""
+    entries = []
+    try:
+        with open(EVOLUTION_LOG) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+    except FileNotFoundError:
+        return {'error': f'No evolution log found. Run detections first.'}
+
+    rewrites = [e for e in entries if e.get('type') == 'rewrite']
+    detections = [e for e in entries if e.get('type') != 'rewrite']
+
+    if len(rewrites) < min_entries:
+        return {
+            'error': f'Need at least {min_entries} rewrites for evolution. Currently have {len(rewrites)}.',
+            'rewrites_count': len(rewrites),
+            'detections_count': len(detections),
+        }
+
+    # ── Learn from rewrite experiences ──
+    fix_effectiveness = {}  # dimension → {successes, attempts, avg_gain}
+    time_decay = {}  # dimension → last_seen_ts
+
+    for rw in rewrites:
+        for dim in rw.get('improved', []):
+            if dim not in fix_effectiveness:
+                fix_effectiveness[dim] = {'successes': 0, 'attempts': 0, 'total_gain': 0, 'failures': 0}
+            fix_effectiveness[dim]['successes'] += 1
+            fix_effectiveness[dim]['attempts'] += 1
+            fix_effectiveness[dim]['total_gain'] += rw['gains'].get(dim, 0)
+        for dim in rw.get('worsened', []):
+            if dim not in fix_effectiveness:
+                fix_effectiveness[dim] = {'successes': 0, 'attempts': 0, 'total_gain': 0, 'failures': 0}
+            fix_effectiveness[dim]['attempts'] += 1
+            fix_effectiveness[dim]['failures'] += 1
+
+    # ── Build evolved rules ──
+    proven_fixes = []   # High-success-rate dimensions → lock the fix
+    fragile_fixes = []  # Mixed results → need better technique
+    stale_dims = []     # Never improved → consider ignoring
+
+    for dim, stats in fix_effectiveness.items():
+        if stats['attempts'] == 0:
+            continue
+        success_rate = stats['successes'] / stats['attempts']
+        avg_gain = stats['total_gain'] / max(stats['successes'], 1)
+
+        if success_rate >= 0.8 and avg_gain >= 1:
+            proven_fixes.append({
+                'dimension': dim,
+                'success_rate': round(success_rate * 100),
+                'avg_gain': round(avg_gain, 1),
+                'attempts': stats['attempts'],
+                'rule': f'{dim}: high-confidence fix — apply automatically. '
+                        f'{stats["successes"]}/{stats["attempts"]} success, +{avg_gain} avg gain.',
+            })
+        elif success_rate >= 0.4:
+            fragile_fixes.append({
+                'dimension': dim,
+                'success_rate': round(success_rate * 100),
+                'avg_gain': round(avg_gain, 1),
+                'attempts': stats['attempts'],
+                'rule': f'{dim}: mixed results — review rewrite approach. '
+                        f'{stats["successes"]}/{stats["attempts"]} success.',
+            })
+        else:
+            stale_dims.append({
+                'dimension': dim,
+                'success_rate': round(success_rate * 100),
+                'attempts': stats['attempts'],
+                'rule': f'{dim}: rarely improves with rewrite — may be content-intrinsic.',
+            })
+
+    # ── Generate evolved config ──
+    evolved = {
+        '_meta': {
+            'evolved_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'based_on': f'{len(rewrites)} rewrites, {len(detections)} detections',
+            'version': VERSION,
+        },
+        'evolution_rules': {
+            'proven_fixes': proven_fixes,
+            'fragile_fixes': fragile_fixes,
+            'stale_dimensions': stale_dims,
+        },
+        # Auto-adjust dimension hints: proven fixes get higher priority in rewrite_hints
+        'priority_hints': [pf['dimension'] for pf in proven_fixes],
+        'skip_hints': [sd['dimension'] for sd in stale_dims],
+    }
+
+    # ── Save snapshot ──
+    snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
+    try:
+        with open(snapshot_path, 'w') as f:
+            json.dump(evolved, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    # ── Update evolution state ──
+    try:
+        with open(EVOLUTION_STATE, 'w') as f:
+            json.dump({
+                'last_evolved': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                'total_rewrites': len(rewrites),
+                'total_detections': len(detections),
+                'proven_fixes_count': len(proven_fixes),
+                'latest_snapshot': snapshot_path,
+            }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+    return evolved
+
+
+def show_evolution_log() -> dict:
+    """Display the detector's own growth trajectory"""
+    entries = []
+    try:
+        with open(EVOLUTION_LOG) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+    except FileNotFoundError:
+        return {'error': 'No evolution log found.'}
+
+    rewrites = [e for e in entries if e.get('type') == 'rewrite']
+    detections = [e for e in entries if e.get('type') != 'rewrite']
+
+    # Score trend over time
+    scores = [(e['ts'][:10], e['score']) for e in detections]
+    score_dates = {}
+    for date, score in scores:
+        if date not in score_dates:
+            score_dates[date] = []
+        score_dates[date].append(score)
+
+    score_timeline = []
+    for date in sorted(score_dates.keys()):
+        vals = score_dates[date]
+        score_timeline.append({
+            'date': date,
+            'count': len(vals),
+            'avg_score': round(sum(vals) / len(vals), 1),
+            'min': min(vals),
+            'max': max(vals),
+        })
+
+    # Rewrite effectiveness over time
+    rewrite_timeline = []
+    for rw in rewrites:
+        rewrite_timeline.append({
+            'date': rw['ts'][:10],
+            'delta': rw['delta_pct'],
+            'improved_count': len(rw.get('improved', [])),
+            'worsened_count': len(rw.get('worsened', [])),
+        })
+
+    # Top improved dimensions across all rewrites
+    dim_gains = {}
+    for rw in rewrites:
+        for dim, gain in rw.get('gains', {}).items():
+            if dim not in dim_gains:
+                dim_gains[dim] = []
+            dim_gains[dim].append(gain)
+
+    top_improvements = []
+    for dim, gains in dim_gains.items():
+        avg_gain = sum(gains) / len(gains)
+        top_improvements.append({
+            'dimension': dim,
+            'avg_gain': round(avg_gain, 1),
+            'count': len(gains),
+            'total_gain': sum(gains),
+        })
+    top_improvements.sort(key=lambda x: -x['total_gain'])
+
+    return {
+        'summary': {
+            'total_detections': len(detections),
+            'total_rewrites': len(rewrites),
+            'tracking_since': entries[0]['ts'][:10] if entries else 'N/A',
+            'overall_trend': 'improving' if rewrites and sum(r['delta_pct'] for r in rewrites) > 0 else 'stable',
+        },
+        'score_timeline': score_timeline,
+        'rewrite_timeline': rewrite_timeline[-20:],  # last 20 rewrites
+        'top_improvements': top_improvements[:10],
+    }
+
+
+def format_evolution_log(data: dict) -> str:
+    """Human-readable evolution log"""
+    if 'error' in data:
+        return f"No evolution data yet: {data['error']}"
+
+    s = data['summary']
+    out = []
+    out.append("╔══════════════════════════════════╗")
+    out.append("║  GEO Auditor — Evolution Log     ║")
+    out.append("╠══════════════════════════════════╣")
+    out.append(f"║  {s['total_detections']} detections + {s['total_rewrites']} rewrites since {s['tracking_since']}  ║")
+    out.append(f"║  Trend: {s['overall_trend']}                              ║")
+    out.append("╚══════════════════════════════════╝")
+    out.append("")
+
+    if data.get('score_timeline'):
+        out.append("  📊 Score Timeline:")
+        for day in data['score_timeline'][-10:]:
+            bar = '█' * min(int(day['avg_score']) // 5, 16)
+            out.append(f"     {day['date']}  avg={day['avg_score']}  {bar}")
+
+    if data.get('top_improvements'):
+        out.append("")
+        out.append("  📈 Most Improved Dimensions:")
+        for imp in data['top_improvements'][:5]:
+            out.append(f"     {imp['dimension']}: +{imp['total_gain']} total ({imp['count']} rewrites, avg +{imp['avg_gain']})")
+
+    if data.get('rewrite_timeline'):
+        recent = [r for r in data['rewrite_timeline'] if r['delta'] > 0]
+        if recent:
+            recent_avg = round(sum(r['delta'] for r in recent) / len(recent), 1)
+            out.append("")
+            out.append(f"  💪 Recent rewrites: avg +{recent_avg}% improvement")
+
+    return '\n'.join(out)
+
+
+def format_evolve_result(data: dict) -> str:
+    """Human-readable evolution result"""
+    if 'error' in data:
+        return f"Evolution not ready: {data['error']}\nRun more detections + rewrites first."
+
+    rules = data['evolution_rules']
+    out = []
+    out.append("╔══════════════════════════════════╗")
+    out.append("║  GEO Auditor — Detector Evolved  ║")
+    out.append("╠══════════════════════════════════╣")
+    out.append(f"║  Based on {data['_meta']['based_on']}    ║")
+    out.append("╚══════════════════════════════════╝")
+    out.append("")
+
+    if rules['proven_fixes']:
+        out.append("  ✅ PROVEN FIXES — apply automatically:")
+        for pf in rules['proven_fixes']:
+            out.append(f"     {pf['dimension']}: {pf['success_rate']}% success, +{pf['avg_gain']} avg")
+        out.append("")
+
+    if rules['fragile_fixes']:
+        out.append("  ⚠️ FRAGILE — review rewrite approach:")
+        for ff in rules['fragile_fixes']:
+            out.append(f"     {ff['dimension']}: {ff['success_rate']}% success")
+        out.append("")
+
+    if rules['stale_dimensions']:
+        out.append("  💤 STALE — rarely improves:")
+        for sd in rules['stale_dimensions']:
+            out.append(f"     {sd['dimension']}: {sd['success_rate']}% — may be content-intrinsic")
+        out.append("")
+
+    if data.get('priority_hints'):
+        out.append(f"  🎯 Priority rewrite order: {', '.join(data['priority_hints'][:5])}")
+
+    return '\n'.join(out)
+
+
 def format_learn(learn: dict) -> str:
     """Human-readable learning output"""
     out = []
@@ -963,6 +1285,9 @@ def format_learn(learn: dict) -> str:
             out.append(f"     {item['dimension']} {item['trend']}: {item['note']}")
 
     return '\n'.join(out)
+
+
+def format_output(result: dict) -> str:
     """Human-readable output"""
     r = result
     grade_emoji = {'S': '🏆 Excellent', 'A': '✅ Good', 'B': '⚠️ Needs Work', 'C': '❌ Rewrite'}
@@ -1146,6 +1471,10 @@ Config file format (geo_auditor.json):
                         help='Like --history but generates executable writing strategy rules')
     parser.add_argument('--rewrite-prompt', action='store_true',
                         help='Generate LLM-ready prompt: suggests 3 rewrites per AI-flagged sentence')
+    parser.add_argument('--evolve', action='store_true',
+                        help='Analyze evolution log, output evolved detector config with proven fixes')
+    parser.add_argument('--evolution-log', action='store_true',
+                        help='Show detector self-evolution trajectory (score timeline + top improvements)')
     parser.add_argument('--version', '-v', action='version', version=f'GEO Auditor v{VERSION}')
     args = parser.parse_args()
 
@@ -1177,6 +1506,23 @@ Config file format (geo_auditor.json):
                 print(format_history(analysis))
         return
 
+    # ── Evolution commands ──
+    if args.evolve:
+        result = evolve_detector()
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(format_evolve_result(result))
+        return
+
+    if args.evolution_log:
+        data = show_evolution_log()
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            print(format_evolution_log(data))
+        return
+
     # ── Compare mode ──
     if args.compare:
         f1, f2 = args.compare
@@ -1191,6 +1537,9 @@ Config file format (geo_auditor.json):
         r1 = detect(c1, config)
         r2 = detect(c2, config)
         cmp = compare_results(r1, r2)
+        log_compare(r1, r2, cmp)
+        log_detection(r1, args.config)
+        log_detection(r2, args.config)
         if args.json:
             print(json.dumps({'before': r1, 'after': r2, 'compare': cmp},
                              ensure_ascii=False, indent=2))
@@ -1224,6 +1573,7 @@ Config file format (geo_auditor.json):
             config = Config(json.load(f))
 
     result = detect(content, config)
+    log_detection(result, args.config)
 
     if args.rewrite_prompt:
         print(generate_rewrite_prompt(content, result))
