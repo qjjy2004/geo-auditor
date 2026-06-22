@@ -56,7 +56,7 @@ def _safe_print(*args, **kwargs):
         print(*safe_args, **kwargs)
 
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 
 # ════════════════════════════════════
 # Default patterns (can be overridden via --config)
