@@ -28,7 +28,33 @@ import os
 import time
 import argparse
 from collections import Counter
-from typing import Optional
+
+def _safe_print(*args, **kwargs):
+    """Print with emoji fallback for non-UTF-8 terminals (e.g. Windows cp936)."""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        import sys
+        # Replace emoji with ASCII equivalents
+        safe_args = []
+        emoji_map = {
+            '🧬': '[EVOLVE]', '📍': '[POS]', '📊': '[DATA]', '🔢': '[STRUCT]',
+            '⚖️': '[COMP]', '❓': '[FAQ]', '📌': '[TITLE]', '🔑': '[KW]',
+            '📏': '[PARA]', '📖': '[SRC]', '🎯': '[CTA]', '🏢': '[ENT]',
+            '🛡️': '[EEAT]', '🤖': '[AI]', '🏆': '[S]', '✅': '[OK]',
+            '⚠️': '[WARN]', '❌': '[FAIL]', '📈': '[UP]', '📉': '[DOWN]',
+            '➡️': '->', '💡': 'TIP:', '▶': '>', '💪': 'STRONG:',
+            '░': '.', '█': '#', '═': '=', '╔': '+', '╗': '+',
+            '║': '|', '╚': '+', '╝': '+', '╠': '+', '╣': '+',
+            '─': '-', '↑': 'UP', '↓': 'DOWN', '→': '->',
+        }
+        for arg in args:
+            if isinstance(arg, str):
+                for emoji, ascii_repl in emoji_map.items():
+                    arg = arg.replace(emoji, ascii_repl)
+            safe_args.append(arg)
+        print(*safe_args, **kwargs)
+
 
 VERSION = "0.6.1"
 
@@ -766,6 +792,14 @@ def detect(text: str, config: Config = None) -> dict:
 def compare_results(r1: dict, r2: dict) -> dict:
     """Compare two detection results, return delta analysis"""
     delta_pct = r2['pct'] - r1['pct']
+    # Validate dimensions match before comparing
+    if len(r1['dimensions']) != len(r2['dimensions']):
+        return {'error': 'Dimension mismatch between results — cannot compare'}
+    dim_names1 = [d['n'] for d in r1['dimensions']]
+    dim_names2 = [d['n'] for d in r2['dimensions']]
+    if dim_names1 != dim_names2:
+        return {'error': f'Dimension name mismatch: {dim_names1} vs {dim_names2}'}
+    
     dim_deltas = []
     for d1, d2 in zip(r1['dimensions'], r2['dimensions']):
         d = d2['s'] - d1['s']
@@ -1020,6 +1054,10 @@ def evolve_detector(min_entries: int = 5) -> dict:
     rewrites = [e for e in entries if e.get('type') == 'rewrite']
     detections = [e for e in entries if e.get('type') != 'rewrite']
 
+    if corrupt_lines > 0:
+        import sys as _sys
+        print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log", file=_sys.stderr)
+
     if len(rewrites) < min_entries:
         return {
             'error': f'Need at least {min_entries} rewrites for evolution. Currently have {len(rewrites)}.',
@@ -1099,6 +1137,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
     }
 
     # ── Save snapshot ──
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
     snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
     try:
         with open(snapshot_path, 'w', encoding='utf-8') as f:
@@ -1599,24 +1638,24 @@ Config file format (geo_auditor.json):
             if line:
                 try:
                     results.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    print(f"Warning: skipped corrupt JSON line: {e}", file=sys.stderr)
         if len(results) < 2:
-            print("Error: need at least 2 JSON results for pattern analysis (via stdin)",
+            _safe_print("Error: need at least 2 JSON results for pattern analysis (via stdin)",
                   file=sys.stderr)
             sys.exit(1)
         if args.learn:
             analysis = learn_from_history(results)
             if args.json:
-                print(json.dumps(analysis, ensure_ascii=False, indent=2))
+                _safe_print(json.dumps(analysis, ensure_ascii=False, indent=2))
             else:
-                print(format_learn(analysis))
+                _safe_print(format_learn(analysis))
         else:
             analysis = analyze_history(results)
             if args.json:
-                print(json.dumps(analysis, ensure_ascii=False, indent=2))
+                _safe_print(json.dumps(analysis, ensure_ascii=False, indent=2))
             else:
-                print(format_history(analysis))
+                _safe_print(format_history(analysis))
         return
 
     # ── Evolution commands ──
@@ -1628,19 +1667,20 @@ Config file format (geo_auditor.json):
         # Inject agent prompt into JSON output
         result['agent_prompt'] = generate_agent_prompt(result)
         if args.json:
-            print(json.dumps(result, ensure_ascii=False, indent=2))
+            _safe_print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
-            print(format_evolve_result(result))
-            print("\n" + "─" * 50)
-            print("# Agent prompt saved. Use --agent-prompt to export.")
+            _safe_print(format_evolve_result(result))
+            if 'error' not in result:
+                _safe_print("\n" + "─" * 50)
+                _safe_print("# Agent prompt saved. Use --agent-prompt to export.")
         return
 
     if args.evolution_log:
         data = show_evolution_log()
         if args.json:
-            print(json.dumps(data, ensure_ascii=False, indent=2))
+            _safe_print(json.dumps(data, ensure_ascii=False, indent=2))
         else:
-            print(format_evolution_log(data))
+            _safe_print(format_evolution_log(data))
         return
 
     # ── Compare mode ──
@@ -1669,20 +1709,24 @@ Config file format (geo_auditor.json):
         log_detection(r1, args.config)
         log_detection(r2, args.config)
         if args.json:
-            print(json.dumps({'before': r1, 'after': r2, 'compare': cmp},
+            _safe_print(json.dumps({'before': r1, 'after': r2, 'compare': cmp},
                              ensure_ascii=False, indent=2))
         else:
-            print(format_output(r1))
-            print("\n" + "─" * 50 + "\n")
-            print(format_output(r2))
-            print("\n" + format_compare(cmp))
+            _safe_print(format_output(r1))
+            _safe_print("\n" + "─" * 50 + "\n")
+            _safe_print(format_output(r2))
+            _safe_print("\n" + format_compare(cmp))
         return
 
     # ── Normal detection mode ──
     content = None
     if args.file:
-        with open(args.file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            with open(args.file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except FileNotFoundError as e:
+            print(f"Error: file not found — {e}", file=sys.stderr)
+            sys.exit(1)
     elif args.stdin:
         content = sys.stdin.read()
     elif args.text:
