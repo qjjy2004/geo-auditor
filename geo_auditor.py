@@ -34,7 +34,6 @@ def _safe_print(*args, **kwargs):
     try:
         print(*args, **kwargs)
     except UnicodeEncodeError:
-        import sys
         # Replace emoji with ASCII equivalents
         safe_args = []
         emoji_map = {
@@ -45,7 +44,7 @@ def _safe_print(*args, **kwargs):
             '⚠️': '[WARN]', '❌': '[FAIL]', '📈': '[UP]', '📉': '[DOWN]',
             '➡️': '->', '💡': 'TIP:', '▶': '>', '💪': 'STRONG:',
             '💤': '[STALE]', '🔄': '[ADAPT]', '🔧': '[FIX]',
-            '📝': '[TPL]', '👀': '[WATCH]',
+            '📝': '[TPL]', '👀': '[WATCH]', '🔗': '[SEM]',
             '░': '.', '█': '#', '═': '=', '╔': '+', '╗': '+',
             '║': '|', '╚': '+', '╝': '+', '╠': '+', '╣': '+',
             '─': '-', '↑': 'UP', '↓': 'DOWN', '→': '->',
@@ -623,7 +622,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     sem_d = ('Title-content intent aligned'
              if sem >= 3 else ('Partial match'
              if sem >= 1 else 'Title and content intent mismatch'))
-    dims.append({'n': 'Semantic Match', 's': sem, 'm': 4, 'd': sem_d, 'icon': '🎯'})
+    dims.append({'n': 'Semantic Match', 's': sem, 'm': 4, 'd': sem_d, 'icon': '🔗'})
     total += sem
 
     # 14. Anti-AI Voice 4 — research-backed multi-signal detection
@@ -1599,6 +1598,8 @@ def generate_agent_prompt(evolved: dict) -> str:
             'Entity Info': '- Include in early paragraphs: a location name (city/province), an organization/company name, and a time reference.',
             'EEAT': '- Establish authority: mention years of experience + a credential/certification + a third-party validation (test report, inspection result).',
             'Semantic Match': '- Ensure the body directly answers the question in the title. Use title keywords in the first paragraph.',
+            'Paragraph Length': '- Keep paragraphs 80-150 chars average. No paragraph over 200 chars. Short paragraphs improve readability.',
+            'Anti-AI Voice': '- Avoid AI tells: no banned words, no RLHF phrasing, no em-dash overuse. Vary sentence length naturally.',
         }
         for pf in rules['proven_fixes']:
             if pf['dimension'] in dimension_principles:
