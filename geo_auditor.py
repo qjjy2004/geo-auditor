@@ -30,7 +30,7 @@ import argparse
 from collections import Counter
 from typing import Optional
 
-VERSION = "1.2.0"
+VERSION = "1.6.0"
 
 # ════════════════════════════════════
 # Default patterns (can be overridden via --config)
@@ -1267,7 +1267,9 @@ def generate_agent_prompt(evolved: dict) -> str:
         lines.append("## PROVEN WRITING PRINCIPLES (high-confidence, apply always)")
         lines.append("")
         dimension_principles = {
-            'Conclusion-First': '- Open with a direct answer in the first sentence. Use phrases like "Here\'s the thing:", "The short answer:", "说白了:", "说真的:". Do NOT lead with background or context.',
+            'Conclusion-First': '- Open with a direct answer in the first sentence. '
+                               'Use phrases like "Here\'s the thing:", "The short answer:", '
+                               '"说白了:", "说真的:". Do NOT lead with background or context.',
             'Data Anchors': '- Include 3+ specific numbers with units (% , count, currency, years). Add 1-2 standard/source references (e.g., "per GB50981", "according to X study").',
             'Structure': '- Use numbered lists (1. 2. 3.) or bullet points for key points. At least one section should be structured as steps.',
             'Comparison': '- Include at least one A vs B comparison. Use "vs", "compared to", "X is 3x more than Y", or numeric contrast ("45 degrees vs 30 degrees").',
