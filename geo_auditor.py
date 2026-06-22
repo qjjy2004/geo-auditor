@@ -23,6 +23,7 @@ Agent learning loop:
 import re
 import sys
 import json
+import math
 import argparse
 from collections import Counter
 from typing import Optional
@@ -53,13 +54,41 @@ DEFAULT_AI_FORBIDDEN = [
 ]
 
 DEFAULT_AI_WASTE = [
+    # ── Research-backed banned vocabulary (GPTZero, HC3, ai-check taxonomy) ──
     'furthermore', 'moreover', 'consequently', 'nevertheless', 'in conclusion',
     'it is worth noting', 'it should be noted', 'as previously mentioned',
     'in summary', 'to summarize', 'as we can see', 'without a doubt',
     'undeniably', 'it is important to', 'one might argue',
+    # Research additions (2024-2026 literature)
+    'delve', 'leverage', 'utilize', 'robust', 'comprehensive',
+    'streamline', 'foster', 'facilitate', 'pivotal', 'nuanced',
+    'multifaceted', 'showcase', 'underscore', 'align with', 'garner',
+    'notable', 'notably', 'a myriad of', 'a plethora of', 'in the realm of',
+    'stands as a testament', 'marks a pivotal', 'evolving landscape',
+    'setting the stage for', 'serves as', 'boasts', 'features', 'offers',
+    # Chinese
     '此外', '而且', '因此', '然而', '综上所述', '可以说', '在某种程度上',
     '往往', '一定的', '值得注意的是', '更为关键的是', '总而言之',
     '众所周知', '不可否认', '毋庸置疑', '总的来看', '总的来讲',
+]
+
+# RLHF / instruction-tuning voice patterns (key 2025-2026 finding)
+RLHF_SIGNALS = [
+    (re.compile(r"here.{0,5}s how.{0,5}i.{0,5}d think about", re.IGNORECASE),
+     'helpful_assistant', '"Here\'s how I\'d think about it" — RLHF scaffold'),
+    (re.compile(r"let me walk you through", re.IGNORECASE),
+     'walkthrough', '"Let me walk you through" — pedagogical AI voice'),
+    (re.compile(r"on one hand.{0,80}on the other", re.IGNORECASE),
+     'balanced_tradeoff', '"On one hand X, on the other Y" — balanced framing'),
+    (re.compile(r"great question|you.{0,3}re absolutely right", re.IGNORECASE),
+     'sycophantic', '"Great question!" / "You\'re absolutely right!" — sycophantic prefix'),
+    (re.compile(r"as of my.{0,15}(?:training|knowledge).{0,10}cutoff", re.IGNORECASE),
+     'cutoff_disclaimer', '"As of my training cutoff" — knowledge disclaimer'),
+    (re.compile(r"while.{0,20}has benefits.{0,30}also presents challenges", re.IGNORECASE),
+     'diplomatic_tradeoff', 'Diplomatic framing of obvious tradeoffs'),
+    (re.compile(r"happy to jump on a call|let me know if you have any questions|feel free to reach out",
+               re.IGNORECASE),
+     'templated_closer', 'Templated email/Slack closer'),
 ]
 
 DEFAULT_REF_PATTERNS = [
@@ -83,6 +112,7 @@ class Config:
         self.entity_patterns = [re.compile(p) for p in d.get('entity_patterns', [])]
         self.ai_forbidden = [re.compile(p) for p in d.get('ai_forbidden', [])]
         self.ai_waste = d.get('ai_waste', [])
+        self.rlhf_signals = d.get('rlhf_signals', [])  # Agent-injected RLHF patterns
         self.ref_patterns = d.get('ref_patterns', [])
         self.data_units = d.get('data_units', '')
 
@@ -251,8 +281,10 @@ def generate_rewrite_hint(dim_name: str, score: int, max_score: int, detail: str
         },
         'Anti-AI Voice': {
             'action': 'remove_ai_tells',
-            'instruction': 'Remove AI-template phrases. Replace "furthermore/in conclusion/it is worth noting" '
-                           'with conversational transitions. Read aloud — if it sounds like a robot, rewrite.',
+            'instruction': '6-signal check failed. Check: (1) banned vocabulary (delve/robust/furthermore etc.), '
+                           '(2) RLHF voice ("Let me walk you through"), (3) burstiness (vary sentence length), '
+                           '(4) punctuation (reduce em dashes/semicolons/curly quotes), '
+                           '(5) paragraph opener variety, (6) sentence structure diversity.',
             'target_section': 'throughout',
         },
     }
@@ -501,33 +533,61 @@ def detect(text: str, config: Config = None) -> dict:
     dims.append({'n': 'Semantic Match', 's': sem, 'm': 4, 'd': sem_d, 'icon': '🎯'})
     total += sem
 
-    # 14. Anti-AI Voice 4 (enhanced: position tracking + diversity + openers)
+    # 14. Anti-AI Voice 4 — research-backed multi-signal detection
+    # DESIGN BOUNDARY: Does NOT penalize GEO-positive structural features
+    # (comparisons, FAQ, numbered lists, conclusion-first openers).
+    # Only targets: pure AI vocabulary, RLHF voice, punctuation fingerprints, burstiness deficit.
     ai_hits = 0
-    ai_found = []  # list of {word, para, suggestion}
+    ai_found = []
+
+    # ── Signal A: AI template patterns (forbidden constructions) ──
     for pat in ai_forbidden:
         for m in pat.finditer(ft):
             pos = ft[:m.start()].count('\n')
-            ai_found.append({'word': m.group(), 'para': pos + 1,
-                            'suggestion': 'Break this pattern — use conversational transition'})
+            ai_found.append({'signal': 'forbidden_pattern', 'word': m.group(), 'para': pos + 1,
+                            'detail': 'Structural template — break with conversational variation'})
             ai_hits += 1
+
+    # ── Signal B: Banned vocabulary (research-backed, EN+CN) ──
     for w in ai_waste:
         escaped = re.escape(w)
         for m in re.finditer(escaped, ft, re.IGNORECASE):
             pos = ft[:m.start()].count('\n')
-            ai_found.append({'word': w, 'para': pos + 1,
-                            'suggestion': f'Avoid template phrase — rephrase in natural voice'})
+            ai_found.append({'signal': 'banned_word', 'word': w, 'para': pos + 1,
+                            'detail': 'Research-flagged AI vocabulary — use natural alternative'})
             ai_hits += 1
 
-    # Sentence diversity: all "X is Y" pattern → low diversity
+    # ── Signal C: RLHF / instruction-tuning voice ──
+    rlhf_hits = 0
+    rlhf_found = []
+    for pat, sig_type, desc in RLHF_SIGNALS:
+        for m in pat.finditer(ft):
+            pos = ft[:m.start()].count('\n')
+            rlhf_found.append({'signal': sig_type, 'word': m.group(), 'para': pos + 1, 'detail': desc})
+            rlhf_hits += 1
+    ai_hits += rlhf_hits
+    ai_found.extend(rlhf_found)
+
+    # ── Signal D: Sentence diversity + burstiness ──
     sents = re.split(r'[.!?。！？\n]', body)
     sents = [s.strip() for s in sents if len(s.strip()) > 10]
+    sent_lengths = [len(s.split()) for s in sents]  # word counts per sentence
+
+    # Burstiness: std dev of sentence length (humans = high variance, AI = uniform)
+    burstiness = 0.0
+    if len(sent_lengths) >= 4:
+        mean_len = sum(sent_lengths) / len(sent_lengths)
+        variance = sum((l - mean_len) ** 2 for l in sent_lengths) / len(sent_lengths)
+        burstiness = round(math.sqrt(variance), 1)
+
+    # Simple declarative ratio
     simple_decl = sum(1 for s in sents if re.match(r'^.{0,5}(是|is|are|was|were)\b', s))
     sent_diversity = 1.0
     if len(sents) >= 4:
         simple_ratio = simple_decl / len(sents)
         sent_diversity = max(0.3, 1.0 - simple_ratio)
 
-    # Paragraph opener repetition
+    # ── Signal E: Paragraph opener repetition ──
     para_openers = []
     for p in paras:
         opener = p.strip()[:15].rstrip('，,.。!！?？\n')
@@ -538,29 +598,59 @@ def detect(text: str, config: Config = None) -> dict:
         oc = Counter(para_openers)
         opener_repeats = sum(c - 1 for c in oc.values() if c > 1)
 
-    # Score synthesis
-    if ai_hits == 0 and sent_diversity > 0.7 and opener_repeats == 0:
-        deai = 4
-    elif ai_hits <= 2 and sent_diversity > 0.5 and opener_repeats <= 1:
-        deai = 3
-    elif ai_hits <= 5:
-        deai = 1
-    else:
-        deai = 0
+    # ── Signal F: Punctuation fingerprints (research-validated) ──
+    # Em dash density: >2 per 500 chars = AI signal (3-5× human rate)
+    em_dash_count = ft.count('—') + ft.count('–')
+    em_dash_density = round(em_dash_count / max(len(ft), 1) * 500, 1)
+    # Semicolons outside academic context: almost exclusively AI
+    semicolon_count = ft.count(';')
+    # Curly/smart quotes (ChatGPT signature)
+    curly_quotes = ft.count('\u201c') + ft.count('\u201d') + ft.count('\u2018') + ft.count('\u2019')
+    punct_score = 1.0  # 1.0 = clean, 0.0 = heavy AI punctuation
+    if em_dash_density > 2: punct_score -= 0.3
+    if semicolon_count > 3: punct_score -= 0.3
+    if curly_quotes > 2: punct_score -= 0.4
+    punct_score = max(0.0, punct_score)
 
-    deai_d = ('Zero AI-tells + varied voice — authentic'
-              if deai >= 4 else ('Minor AI traces, acceptable'
-              if deai >= 3 else (f'{ai_hits} AI-tells, low diversity — rewrite naturally'
-              if deai >= 1 else f'{ai_hits} AI-tells — heavy machine voice')))
+    # ── Score synthesis (6 signals) ──
+    deai = 4
+    if ai_hits > 5: deai -= 2
+    elif ai_hits > 2: deai -= 1
+    if burstiness < 5 and len(sent_lengths) >= 4: deai -= 1  # SD < 5 words = metronomic
+    if sent_diversity < 0.5: deai -= 1
+    if opener_repeats > 2: deai -= 1
+    if punct_score < 0.4: deai -= 1
+    deai = max(0, deai)
+
+    # Diagnosis string
+    reasons = []
+    if ai_hits > 0: reasons.append(f'{ai_hits} AI-tells')
+    if burstiness > 0 and burstiness < 5: reasons.append(f'burstiness={burstiness}(low)')
+    if sent_diversity < 0.7: reasons.append(f'diversity={sent_diversity}')
+    if opener_repeats > 0: reasons.append(f'{opener_repeats} repeated openers')
+    if punct_score < 0.7: reasons.append(f'punct={punct_score}')
+    deai_d = ('Clean human voice' if deai >= 4 else
+              ('Minor signals: ' + ', '.join(reasons) if deai >= 3 else
+               ('Mixed signals: ' + ', '.join(reasons) if deai >= 1 else
+                'Heavy AI voice: ' + ', '.join(reasons))))
 
     voice_details = {
         'ai_word_count': ai_hits,
-        'ai_words_found': ai_found[:20],  # top 20 with position+replacement
+        'ai_words_found': ai_found[:30],
+        'rlhf_signals': rlhf_found,
+        'burstiness': burstiness,
         'sentence_diversity': round(sent_diversity, 2),
         'sentence_count': len(sents),
         'simple_declarative_pct': round(simple_decl / max(len(sents), 1) * 100),
         'opener_repeats': opener_repeats,
         'repeated_openers': [o for o, c in Counter(para_openers).items() if c > 1][:5],
+        'punctuation': {
+            'em_dash_count': em_dash_count,
+            'em_dash_per_500_chars': em_dash_density,
+            'semicolon_count': semicolon_count,
+            'curly_quote_count': curly_quotes,
+            'punct_score': round(punct_score, 2),
+        },
     }
     dims.append({'n': 'Anti-AI Voice', 's': deai, 'm': 4, 'd': deai_d, 'icon': '🤖'})
     total += deai
