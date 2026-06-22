@@ -590,16 +590,16 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
 
     # 12. EEAT 8
     eeat = 0
-    if re.search(r'\d+[\s\-]*(?:years|年).*(?:experience|经验|in\s|of\s)', ft):
+    if re.search(r'\d+[\s\-]*(?:years|年).*(?:experience|经验|in\s|of\s)', ft, re.IGNORECASE):
         eeat += 3
     elif re.search(r'(?:做了?|干了?|跑过|从业|入行|从事).{0,15}\d+\s*年|'
                    r'\d+\s*年.{0,15}(?:经验|经历|从业|入行)', ft):
         eeat += 3
     if re.search(r'certified|licensed|PhD|degree|expert|professional|'
-                 r'认证|资质|专业|工程师|博士|证书', ft):
+                 r'认证|资质|专业|工程师|博士|证书', ft, re.IGNORECASE):
         eeat += 3
     if re.search(r'reviewed|verified|tested|published|peer|audited|'
-                 r'检测报告|型式检验|第三方|验证|审核|认证', ft):
+                 r'检测报告|型式检验|第三方|验证|审核|认证', ft, re.IGNORECASE):
         eeat += 2
     if eeat >= 6: eeat = 8
     elif eeat >= 4: eeat = 6
@@ -614,10 +614,10 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # 13. Semantic Match 4
     sem = 0
     if re.search(r'how|what|why|which|when|where|who|'
-                 r'怎么|如何|什么|哪|为什么|多少|吗', title):
+                 r'怎么|如何|什么|哪|为什么|多少|吗', title, re.IGNORECASE):
         sem += 2
     if re.search(r'because|therefore|reason|answer|key|core|'
-                 r'因为|所以|原因|答案|关键|核心', body[:200]):
+                 r'因为|所以|原因|答案|关键|核心', body[:200], re.IGNORECASE):
         sem += 2
     sem_d = ('Title-content intent aligned'
              if sem >= 3 else ('Partial match'
