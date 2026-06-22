@@ -378,10 +378,15 @@ def generate_rewrite_hint(dim_name: str, score: int, max_score: int, detail: str
     return h
 
 
-def detect(text: str, config: Config = None) -> dict:
-    """Core detection engine — 14 dimensions, 100 points"""
+def detect(text: str, config: Config = None, evolved_weights: dict = None) -> dict:
+    """Core detection engine — 14 dimensions, 100 points.
+    If evolved_weights is provided, stale dimensions are neutralized
+    and proven dimensions are relaxed — the detector adapts to what
+    the Agent has already learned."""
     if config is None:
         config = Config()
+    if evolved_weights is None:
+        evolved_weights = {}
 
     entity_patterns = config.entity_patterns_or_default()
     ai_forbidden = config.ai_forbidden_or_default()
@@ -748,6 +753,33 @@ def detect(text: str, config: Config = None) -> dict:
     dims.append({'n': 'Anti-AI Voice', 's': deai, 'm': 4, 'd': deai_d, 'icon': '🤖'})
     total += deai
 
+    # ── Apply evolved weights (detection feedback loop) ──
+    # stale dims (weight=0): replace score with neutral value — don't penalize
+    # proven dims (weight=0.5): floor score at 70% of max — don't nag about wins
+    # fragile/unmentioned (weight=1.0): unchanged
+    evolved_adjustments = []
+    for d in dims:
+        w = evolved_weights.get(d['n'], 1.0)
+        if w == 0.0:
+            # Stale: never improves — neutralize to default median
+            neutral = round(d['m'] * 0.6)
+            d['_original_score'] = d['s']
+            d['_weight'] = 0.0
+            d['s'] = neutral
+            d['d'] = f'[Evolved: skipped — rarely improves] {d["d"]}'
+            evolved_adjustments.append(d['n'])
+        elif w == 0.5:
+            # Proven: Agent has internalized — floor at 70%, don't nag
+            floor = round(d['m'] * 0.7)
+            d['_original_score'] = d['s']
+            d['_weight'] = 0.5
+            d['s'] = max(d['s'], floor)
+            if d['_original_score'] >= floor:
+                d['d'] = f'[Evolved: proven strength] {d["d"]}'
+
+    # Recalculate total with adjusted scores
+    total = sum(d['s'] for d in dims)
+
     # Summary
     pct = round(total / max_total * 100)
     if pct >= 85: grade = 'S'
@@ -758,7 +790,8 @@ def detect(text: str, config: Config = None) -> dict:
     # Structured rewrite hints for Agent
     rewrite_hints = []
     for d in dims:
-        if d['s'] / d['m'] < 0.5:
+        w = evolved_weights.get(d['n'], 1.0)
+        if w > 0 and d['s'] / d['m'] < 0.5:
             rewrite_hints.append(generate_rewrite_hint(d['n'], d['s'], d['m'], d['d']))
 
     # Text suggestions (human-readable)
@@ -1144,8 +1177,23 @@ def evolve_detector(min_entries: int = 5) -> dict:
     except Exception:
         pass
 
+    # ── Build evolved dimension weights for detection feedback loop ──
+    # stale_dims → weight 0 (skip — never improves, noise only)
+    # proven_fixes → weight 0.5 (Agent has internalized — reduce scrutiny)
+    # fragile → weight 1.0 (keep watching)
+    # unmentioned → weight 1.0 (no data yet)
+    evolved_dim_weights = {}
+    for sd in stale_dims:
+        evolved_dim_weights[sd['dimension']] = 0.0
+    for pf in proven_fixes:
+        evolved_dim_weights[pf['dimension']] = 0.5
+    for ff in fragile_fixes:
+        evolved_dim_weights[ff['dimension']] = 1.0
+    evolved['evolved_dim_weights'] = evolved_dim_weights
+
     # ── Update evolution state ──
     try:
+        os.makedirs(os.path.dirname(EVOLUTION_STATE), exist_ok=True)
         with open(EVOLUTION_STATE, 'w', encoding='utf-8') as f:
             json.dump({
                 'last_evolved': time.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -1314,6 +1362,12 @@ def format_evolve_result(data: dict) -> str:
 
     if data.get('priority_hints'):
         out.append(f"  🎯 Priority rewrite order: {', '.join(data['priority_hints'][:5])}")
+    if data.get('evolved_dim_weights'):
+        stale_count = sum(1 for w in data['evolved_dim_weights'].values() if w == 0)
+        proven_count = sum(1 for w in data['evolved_dim_weights'].values() if w == 0.5)
+        out.append("")
+        out.append(f"  🔄 Detector adapted: {stale_count} dims skipped, {proven_count} dims relaxed")
+        out.append("     Weights auto-loaded on next detection.")
 
     return '\n'.join(out)
 
@@ -1704,8 +1758,23 @@ Config file format (geo_auditor.json):
             except (FileNotFoundError, json.JSONDecodeError) as e:
                 print(f"Error loading config: {e}", file=sys.stderr)
                 sys.exit(1)
-        r1 = detect(c1, config)
-        r2 = detect(c2, config)
+        # Load evolved weights for compare mode too
+        cmp_evolved = None
+        evolved_state_path = os.path.expanduser('~/.geo-auditor/evolution_state.json')
+        try:
+            if os.path.exists(evolved_state_path):
+                import json as _json
+                with open(evolved_state_path, encoding='utf-8') as _f:
+                    state = _json.load(_f)
+                snap = state.get('latest_snapshot')
+                if snap and os.path.exists(snap):
+                    with open(snap, encoding='utf-8') as _f:
+                        snap_data = _json.load(_f)
+                        cmp_evolved = snap_data.get('evolved_dim_weights', {})
+        except Exception:
+            pass
+        r1 = detect(c1, config, cmp_evolved)
+        r2 = detect(c2, config, cmp_evolved)
         cmp = compare_results(r1, r2)
         log_compare(r1, r2, cmp)
         log_detection(r1, args.config)
@@ -1753,7 +1822,24 @@ Config file format (geo_auditor.json):
             print(f"Error: invalid config JSON — {e}", file=sys.stderr)
             sys.exit(1)
 
-    result = detect(content, config)
+    # Load evolved weights if available (auto-feedback loop)
+    evolved_weights = None
+    evolved_state_path = os.path.expanduser('~/.geo-auditor/evolution_state.json')
+    try:
+        if os.path.exists(evolved_state_path):
+            import json as _json
+            with open(evolved_state_path, encoding='utf-8') as _f:
+                state = _json.load(_f)
+            # Load from latest snapshot if exists
+            snap = state.get('latest_snapshot')
+            if snap and os.path.exists(snap):
+                with open(snap, encoding='utf-8') as _f:
+                    snap_data = _json.load(_f)
+                    evolved_weights = snap_data.get('evolved_dim_weights', {})
+    except Exception:
+        pass
+
+    result = detect(content, config, evolved_weights)
     log_detection(result, args.config)
 
     if args.rewrite_prompt:
