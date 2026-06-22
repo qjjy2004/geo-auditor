@@ -91,6 +91,47 @@ RLHF_SIGNALS = [
      'templated_closer', 'Templated email/Slack closer'),
 ]
 
+# ── Reference alternatives for banned vocabulary (offline, zero-API) ──
+# "Consider using" — suggestions, not replacement commands. Context-dependent.
+AI_ALTERNATIVES = {
+    'delve': 'explore / dig into / get into / examine',
+    'leverage': 'use / tap into / make the most of / put to work',
+    'utilize': 'use / apply / put to use',
+    'robust': 'solid / reliable / proven / battle-tested',
+    'comprehensive': 'thorough / complete / full / in-depth',
+    'streamline': 'simplify / speed up / cut through / make faster',
+    'foster': 'build / create / encourage / grow',
+    'facilitate': 'help / make possible / enable / ease',
+    'pivotal': 'critical / key / central / game-changing',
+    'nuanced': 'subtle / layered / complex / fine-grained',
+    'multifaceted': 'complex / many-sided / layered',
+    'showcase': 'show / display / highlight / put on display',
+    'underscore': 'stress / emphasize / highlight / drive home',
+    'garner': 'get / earn / win / pick up',
+    'notable': 'worth noting / striking / key / important',
+    'a myriad of': 'many / countless / dozens of / a range of',
+    'a plethora of': 'many / lots of / a wealth of / plenty of',
+    'in the realm of': 'in / within / around / about',
+    'furthermore': 'also / plus / what\'s more / on top of that',
+    'moreover': 'beyond that / and / besides',
+    'consequently': 'so / as a result / that means / therefore',
+    'nevertheless': 'but / still / even so / that said',
+    'in conclusion': 'bottom line / here\'s the thing / to wrap up',
+    'it is worth noting': 'note this / keep in mind / here\'s the key',
+    'it should be noted': 'remember / the thing is / key point',
+    'without a doubt': 'no question / hands down / clearly',
+    'undeniably': 'no doubt / for sure / without question',
+    'it is important to': 'you need to / don\'t skip this / here\'s why it matters',
+    'one might argue': 'some say / you could say / the argument goes',
+    '此外': '还有 / 另外 / 顺便说一句',
+    '因此': '所以 / 这就导致 / 结果就是',
+    '然而': '但是 / 不过 / 实际上',
+    '综上所述': '总结一下 / 说穿了 / 一句话',
+    '值得注意的是': '关键是 / 重点是 / 你要知道',
+    '总而言之': '一句话 / 说到底',
+    '众所周知': '大家都知道 / 做这行的都懂',
+}
+
 DEFAULT_REF_PATTERNS = [
     r'reference|source|citation|according.to|study|survey|'
     r'published|reported|data.from|verified.by|link|'
@@ -553,8 +594,9 @@ def detect(text: str, config: Config = None) -> dict:
         escaped = re.escape(w)
         for m in re.finditer(escaped, ft, re.IGNORECASE):
             pos = ft[:m.start()].count('\n')
+            alt = AI_ALTERNATIVES.get(w.lower(), 'rephrase in natural voice')
             ai_found.append({'signal': 'banned_word', 'word': w, 'para': pos + 1,
-                            'detail': 'Research-flagged AI vocabulary — use natural alternative'})
+                            'detail': f'Consider: {alt}'})
             ai_hits += 1
 
     # ── Signal C: RLHF / instruction-tuning voice ──
@@ -1018,6 +1060,49 @@ def format_history(analysis: dict) -> str:
     return '\n'.join(out)
 
 
+def generate_rewrite_prompt(text: str, result: dict) -> str:
+    """Generate an LLM-ready prompt asking for 3 rewrite alternatives per flagged sentence.
+    Zero-API: paste this into any LLM chat (ChatGPT, DeepSeek, Claude, etc.)"""
+    vd = result.get('voice_details', {})
+    flagged = vd.get('ai_words_found', [])
+
+    if not flagged:
+        return "# No AI-flagged content found. No rewrites needed."
+
+    lines = text.split('\n')
+    # Group by paragraph
+    by_para = {}
+    for f in flagged:
+        p = f['para']
+        if p not in by_para:
+            by_para[p] = []
+        by_para[p].append(f)
+
+    prompt = []
+    prompt.append("Rewrite the following sentences to remove AI-template language.")
+    prompt.append("For each flagged sentence, provide 3 natural alternatives.")
+    prompt.append("Keep the original meaning. Vary sentence structure. Use conversational voice.\n")
+
+    for para_num in sorted(by_para.keys()):
+        items = by_para[para_num]
+        words = ', '.join(set(f['word'] for f in items))
+        # Get the paragraph text
+        para_text = lines[para_num - 1] if para_num <= len(lines) else '(not found)'
+        para_text = para_text[:300]
+
+        prompt.append(f"## Paragraph {para_num}")
+        prompt.append(f"Flagged: {words}")
+        prompt.append(f"Original: {para_text}")
+        prompt.append("")
+        prompt.append("Give 3 rewrite alternatives:")
+        prompt.append("1. [rewrite 1]")
+        prompt.append("2. [rewrite 2]")
+        prompt.append("3. [rewrite 3]")
+        prompt.append("")
+
+    return '\n'.join(prompt)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='GEO Auditor — AI Search Content Quality Detector (Agent-Ready)',
@@ -1059,6 +1144,8 @@ Config file format (geo_auditor.json):
                         help='Read JSONL results from stdin, analyze improvement patterns')
     parser.add_argument('--learn', action='store_true',
                         help='Like --history but generates executable writing strategy rules')
+    parser.add_argument('--rewrite-prompt', action='store_true',
+                        help='Generate LLM-ready prompt: suggests 3 rewrites per AI-flagged sentence')
     parser.add_argument('--version', '-v', action='version', version=f'GEO Auditor v{VERSION}')
     args = parser.parse_args()
 
@@ -1138,7 +1225,9 @@ Config file format (geo_auditor.json):
 
     result = detect(content, config)
 
-    if args.json:
+    if args.rewrite_prompt:
+        print(generate_rewrite_prompt(content, result))
+    elif args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(format_output(result))
