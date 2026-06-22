@@ -169,7 +169,7 @@ DEFAULT_REF_PATTERNS = [
 
 DEFAULT_DATA_UNITS = (
     r'billion|million|thousand|hundred|%|USD|EUR|CNY|¥|\$|€|'
-    r'kg|km|mm|cm|m|t|℃|°F|years|months|days|hours|times|users|people|'
+    r'kg|km|mm|cm|m|t|℃|°F|years|months|weeks|days|hours|times|users|people|'
     r'亿|万|千|百|元|套|个|次|年|月|日|条|家|N·m|kN|MPa|吨'
 )
 
