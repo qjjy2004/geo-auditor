@@ -476,15 +476,19 @@ def detect(text: str, config: Config = None) -> dict:
                 kw_score = 8
                 kw_top = kw
                 break
-            elif c >= 1 and kw_score < 5:
-                kw_score = 5
+            elif c >= 2 and kw_score < 6:
+                kw_score = 6
+                kw_top = kw
+            elif c >= 1 and kw_score < 4:
+                kw_score = 4
                 kw_top = kw
         if not kw_score:
             kw_score = 2
             kw_top = '(none matched)'
         kw_d = (f'"{kw_top}" well covered (≥3x)'
-                if kw_score >= 7 else (f'"{kw_top}" sparse — aim for 3-5x'
-                if kw_score >= 4 else 'Custom keywords not found in text'))
+                if kw_score >= 8 else (f'"{kw_top}" appears 2x — aim for 3-5x'
+                if kw_score >= 6 else (f'"{kw_top}" appears 1x — too sparse'
+                if kw_score >= 4 else 'Custom keywords not found in text')))
     else:
         topic_phrases = extract_topic_phrases(body)
         for phrase in topic_phrases:
@@ -960,6 +964,7 @@ def log_detection(result: dict, config_path: str = None):
     """Auto-log each detection for evolution tracking. Non-blocking, silent failure."""
     try:
         os.makedirs(EVOLUTION_DIR, exist_ok=True)
+        os.makedirs(SNAPSHOT_DIR, exist_ok=True)
         entry = {
             'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'score': result['pct'],
@@ -978,6 +983,7 @@ def log_compare(before: dict, after: dict, cmp: dict):
     """Log a rewrite comparison — the core learning signal."""
     try:
         os.makedirs(EVOLUTION_DIR, exist_ok=True)
+        os.makedirs(SNAPSHOT_DIR, exist_ok=True)
         entry = {
             'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
             'type': 'rewrite',
@@ -1095,14 +1101,14 @@ def evolve_detector(min_entries: int = 5) -> dict:
     # ── Save snapshot ──
     snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
     try:
-        with open(snapshot_path, 'w') as f:
+        with open(snapshot_path, 'w', encoding='utf-8') as f:
             json.dump(evolved, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
 
     # ── Update evolution state ──
     try:
-        with open(EVOLUTION_STATE, 'w') as f:
+        with open(EVOLUTION_STATE, 'w', encoding='utf-8') as f:
             json.dump({
                 'last_evolved': time.strftime('%Y-%m-%dT%H:%M:%S'),
                 'total_rewrites': len(rewrites),
