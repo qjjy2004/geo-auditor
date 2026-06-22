@@ -1,4 +1,4 @@
-这是 GEO Auditor v0.6.0，一个开源的 AI 搜索内容质量检测器。请做全面的 Bug Review。
+这是 GEO Auditor v0.6.2，一个开源的 AI 搜索内容质量检测器。请做全面的 Bug Review。
 
 ## 项目简介
 14 维度检测 + 6 信号去 AI 化 + Agent 驱动的自我进化系统。纯 Python 3.7+，零外部依赖。支持中英双语。
