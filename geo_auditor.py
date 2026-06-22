@@ -1100,12 +1100,8 @@ def evolve_detector(min_entries: int = 5, recent_window: int = 30) -> dict:
     if corrupt_lines > 0:
         _safe_print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log")
 
-    if len(rewrites) < min_entries:
-        return {
-            'error': f'Need at least {min_entries} rewrites for evolution. Currently have {len(rewrites)}.',
-            'rewrites_count': len(rewrites),
-            'detections_count': len(detections),
-        }
+    # No global minimum — let per-dimension classification handle small samples naturally.
+    # Dimensions with <5 rewrites will get 'insufficient_data' status (weight 1.0).
 
     # Only consider recent window (time-decay by recency)
     rewrites = rewrites[-recent_window:]
@@ -1172,7 +1168,12 @@ def evolve_detector(min_entries: int = 5, recent_window: int = 30) -> dict:
         avg_delta = stats['total_delta'] / max(stats['successes'], 1) if stats['successes'] > 0 else 0
 
         # Classification with minimum sample sizes
-        if rw_attempts < 5:
+        # Detection-sourced stale FIRST — doesn't depend on rewrite count
+        if obs >= 10 and missing_rate >= 0.8:
+            status = 'stale'
+            weight = 0.75
+            classification = 'stale'
+        elif rw_attempts < 5:
             status = 'insufficient_data'
             weight = 1.0
             classification = 'insufficient_data'
@@ -1180,10 +1181,6 @@ def evolve_detector(min_entries: int = 5, recent_window: int = 30) -> dict:
             status = 'proven'
             weight = 1.05
             classification = 'proven'
-        elif obs >= 10 and missing_rate >= 0.8:
-            status = 'stale'
-            weight = 0.75
-            classification = 'stale'
         elif rw_attempts >= 8 and beta_success < 0.2:
             status = 'stale'
             weight = 0.75
@@ -1522,19 +1519,19 @@ def format_evolve_result(data: dict) -> str:
     if rules['proven_fixes']:
         out.append("  ✅ PROVEN FIXES — apply automatically:")
         for pf in rules['proven_fixes']:
-            out.append(f"     {pf['dimension']}: {pf['success_rate']}% success, +{pf['avg_gain']} avg")
+            out.append(f"     {pf['dimension']}: {pf['beta_success_rate']}% success, +{pf['avg_delta']} avg")
         out.append("")
 
     if rules['fragile_fixes']:
         out.append("  ⚠️ FRAGILE — review rewrite approach:")
         for ff in rules['fragile_fixes']:
-            out.append(f"     {ff['dimension']}: {ff['success_rate']}% success")
+            out.append(f"     {ff['dimension']}: {ff['beta_success_rate']}% success")
         out.append("")
 
     if rules['stale_dimensions']:
         out.append("  💤 STALE — rarely improves:")
         for sd in rules['stale_dimensions']:
-            out.append(f"     {sd['dimension']}: {sd['success_rate']}% — may be content-intrinsic")
+            out.append(f"     {sd['dimension']}: {sd['beta_success_rate']}% — may be content-intrinsic")
         out.append("")
 
     if data.get('priority_hints'):
@@ -1594,7 +1591,7 @@ def generate_agent_prompt(evolved: dict) -> str:
         }
         for pf in rules['proven_fixes']:
             if pf['dimension'] in dimension_principles:
-                lines.append(f"### {pf['dimension']} ({pf['success_rate']}% effective, +{pf['avg_gain']} avg gain)")
+                lines.append(f"### {pf['dimension']} ({pf['beta_success_rate']}% effective, +{pf['avg_delta']} avg gain)")
                 lines.append(dimension_principles[pf['dimension']])
                 lines.append("")
 
@@ -1614,7 +1611,7 @@ def generate_agent_prompt(evolved: dict) -> str:
     if rules['stale_dimensions']:
         lines.append("## DEPRIORITIZE — These rarely improve with rewriting")
         for sd in rules['stale_dimensions']:
-            lines.append(f"- {sd['dimension']}: {sd['success_rate']}% success rate. Focus energy elsewhere.")
+            lines.append(f"- {sd['dimension']}: {sd['beta_success_rate']}% success rate. Focus energy elsewhere.")
         lines.append("")
 
     # ── Priority order ──
