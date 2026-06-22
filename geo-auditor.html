@@ -101,6 +101,21 @@ textarea:focus { outline: none; border-color: var(--ac); }
   z-index: 9999; pointer-events: none; opacity: 0; transition: opacity .3s;
 }
 .toast.show { opacity: 1; }
+/* ── Mini survey ── */
+.survey-card {
+  margin-top: 16px; padding: 14px 18px; border-radius: 8px;
+  background: rgba(88,166,255,.05); border: 1px solid rgba(88,166,255,.15);
+  font-size: 13px; display: none;
+}
+.survey-card h4 { font-size: 13px; color: #fff; margin: 0 0 10px 0; }
+.survey-card label { display: block; margin: 6px 0; cursor: pointer; color: var(--tx); }
+.survey-card label:hover { color: #fff; }
+.survey-card input[type=radio] { margin-right: 8px; }
+.survey-card .survey-btn {
+  margin-top: 10px; padding: 6px 14px; border-radius: 4px; font-size: 12px;
+  background: var(--ac); color: #fff; border: none; cursor: pointer;
+}
+.survey-card .survey-skip { background: transparent; color: var(--mu); margin-left: 8px; }
 footer {
   text-align: center; padding: 30px; color: var(--mu); font-size: 12px;
   border-top: 1px solid var(--bd); margin-top: 40px;
@@ -140,6 +155,27 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
     </div>
     <div class="result" id="resultPanel">
       <div id="resultContent"></div>
+    </div>
+
+    <!-- Mini commercialization survey -->
+    <div class="survey-card" id="surveyCard">
+      <h4>Help shape GEO Auditor (30s)</h4>
+      <div id="surveyQ1">
+        <p style="color:var(--mu);margin-bottom:6px">What do you use it for?</p>
+        <label><input type="radio" name="q1" value="personal"> Personal writing</label>
+        <label><input type="radio" name="q1" value="team"> Team / company content</label>
+        <label><input type="radio" name="q1" value="agent"> Training my AI Agent</label>
+        <label><input type="radio" name="q1" value="curious"> Just curious</label>
+      </div>
+      <div id="surveyQ2" style="margin-top:8px">
+        <p style="color:var(--mu);margin-bottom:6px">Would you pay for?</p>
+        <label><input type="radio" name="q2" value="agent-prompt"> Auto-evolving Agent prompts</label>
+        <label><input type="radio" name="q2" value="industry"> Industry-specific configs</label>
+        <label><input type="radio" name="q2" value="api"> API access</label>
+        <label><input type="radio" name="q2" value="none"> Not interested in paying</label>
+      </div>
+      <button class="survey-btn" onclick="submitSurvey()">Submit</button>
+      <button class="survey-btn survey-skip" onclick="dismissSurvey()">Skip</button>
     </div>
   </div>
 
@@ -392,6 +428,39 @@ function runCheck() {
   saveToHistory(r);
   document.getElementById('copyBtn').style.display = 'inline-flex';
   window._lastResult = r;
+  maybeShowSurvey();
+}
+
+// ── Survey (pops once after 3rd detection, never again) ──
+const SURVEY_KEY = 'geo_auditor_survey_done';
+const SURVEY_THRESHOLD = 3;
+
+function maybeShowSurvey() {
+  if (localStorage.getItem(SURVEY_KEY)) return;
+  let cnt = parseInt(localStorage.getItem('geo_auditor_run_count') || '0');
+  cnt++;
+  localStorage.setItem('geo_auditor_run_count', cnt);
+  if (cnt >= SURVEY_THRESHOLD) {
+    document.getElementById('surveyCard').style.display = 'block';
+    document.getElementById('surveyCard').scrollIntoView({behavior: 'smooth'});
+  }
+}
+
+function submitSurvey() {
+  const q1 = document.querySelector('input[name="q1"]:checked');
+  const q2 = document.querySelector('input[name="q2"]:checked');
+  if (!q1 || !q2) { toast('Please answer both questions'); return; }
+  // Log locally (no server — privacy-first)
+  const surveys = JSON.parse(localStorage.getItem('geo_auditor_surveys') || '[]');
+  surveys.push({q1: q1.value, q2: q2.value, ts: new Date().toISOString()});
+  localStorage.setItem('geo_auditor_surveys', JSON.stringify(surveys));
+  localStorage.setItem(SURVEY_KEY, '1');
+  document.getElementById('surveyCard').innerHTML = '<p style="color:#3fb950">✓ Thanks! Your input shapes what we build next.</p>';
+}
+
+function dismissSurvey() {
+  localStorage.setItem(SURVEY_KEY, '1');
+  document.getElementById('surveyCard').style.display = 'none';
 }
 
 function renderResult(r) {
