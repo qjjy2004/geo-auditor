@@ -197,7 +197,7 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
 
 <script>
 // ══════════════════════════════════════════
-// GEO Auditor v0.6 — 14-dimension engine
+// GEO Auditor v0.6.1 — 14-dimension engine
 // Language-agnostic, zero-config
 // Agent API: window.GEOAuditor.detect(text)
 // ══════════════════════════════════════════
@@ -221,6 +221,17 @@ const AI_WASTE = [
   '此外','而且','因此','然而','综上所述','可以说','在某种程度上',
   '往往','一定的','值得注意的是','更为关键的是','总而言之',
   '众所周知','不可否认','毋庸置疑','总的来看','总的来讲'
+];
+
+// RLHF / instruction-tuning voice patterns (research-backed)
+const RLHF_SIGNALS = [
+  [/here.{0,5}s how.{0,5}i.{0,5}d think about/gi, 'helpful_assistant', '"Here\'s how I\'d think about it" — RLHF scaffold'],
+  [/let me walk you through/gi, 'walkthrough', '"Let me walk you through" — pedagogical AI voice'],
+  [/on one hand.{0,80}on the other/gi, 'balanced_tradeoff', '"On one hand X, on the other Y" — balanced framing'],
+  [/great question|you.{0,3}re absolutely right/gi, 'sycophantic', '"Great question!" / "You\'re absolutely right!" — sycophantic prefix'],
+  [/as of my.{0,15}(?:training|knowledge).{0,10}cutoff/gi, 'cutoff_disclaimer', '"As of my training cutoff" — knowledge disclaimer'],
+  [/while.{0,20}has benefits.{0,30}also presents challenges/gi, 'diplomatic_tradeoff', 'Diplomatic framing of obvious tradeoffs'],
+  [/happy to jump on a call|let me know if you have any questions|feel free to reach out/gi, 'templated_closer', 'Templated email/Slack closer'],
 ];
 
 const STOPS = new Set([
@@ -259,6 +270,15 @@ function extractTopicPhrases(text, topN) {
         if (count >= 2) candidates.push([chunk, count]);
       }
     }
+    // Filter substring overlaps: longer n-grams take priority
+    candidates.sort((a, b) => b[0].length - a[0].length || b[1] - a[1]);
+    let filtered = [];
+    for (let [phrase, count] of candidates) {
+      if (!filtered.some(([other]) => phrase !== other && other.includes(phrase))) {
+        filtered.push([phrase, count]);
+      }
+    }
+    candidates = filtered;
   } else {
     const words = clean.split(/\s+/).filter(w => w.length > 0);
     if (words.length >= 3) {
@@ -288,7 +308,8 @@ function escRegex(s) {
 // ── Core Detection Engine ──
 function detect(text) {
   const lines = text.split('\n');
-  const title = (lines[0] || '').length < 80 ? lines[0] : '';
+  const firstLine = (lines[0] || '').trim();
+  const title = firstLine && firstLine.length < 80 ? firstLine : '';
   const body = title ? lines.slice(1).join('\n') : text;
   const ft = text;
   let dims = [], total = 0, maxTotal = 100;
@@ -303,7 +324,7 @@ function detect(text) {
   // 2. Data Anchors 10
   let nm = countMatches(ft, /\d+\.?\d*\s*(billion|million|thousand|hundred|%|USD|EUR|CNY|¥|\$|€|kg|km|mm|cm|m|t|℃|°F|years|months|days|hours|times|users|people|亿|万|千|百|元|套|个|次|年|月|日|条|家|N·m|kN|MPa|吨)/gi);
   let sm = countMatches(ft, /reference|source|citation|standard|spec|according.to|reported.by|study|survey|research|data.from|参考|来源|标准|规范|据.*显示|第.*条/gi);
-  let da = nm >= 4 && sm >= 2 ? 10 : nm >= 3 ? 7 : nm >= 2 ? 5 : nm >= 1 ? 2 : 0;
+  let da = nm >= 4 && sm >= 2 ? 10 : nm >= 3 && sm >= 1 ? 8 : nm >= 3 ? 7 : nm >= 2 && sm >= 1 ? 6 : nm >= 2 ? 5 : sm >= 3 ? 4 : sm >= 1 ? 3 : nm >= 1 ? 2 : 0;
   dims.push({n:'Data Anchors', s:da, m:10, d:(da>=9?'Excellent':da>=5?'Decent':'Add specific numbers and sources') + ` (${nm} data pts + ${sm} refs)`, icon:'📊'});
   total += da;
 
@@ -399,14 +420,100 @@ function detect(text) {
   dims.push({n:'Semantic Match', s:sem, m:4, d:sem>=3?'Title-content intent aligned':sem>=1?'Partial match':'Title and content intent mismatch', icon:'🎯'});
   total += sem;
 
-  // 14. Anti-AI Voice 4
+  // 14. Anti-AI Voice 4 — research-backed 6-signal detection
+  // DESIGN BOUNDARY: GEO-positive structures (comparisons, FAQ, lists) are NOT penalized.
+  // Only targets: pure AI vocabulary, RLHF voice, punctuation fingerprints, burstiness deficit.
+  
+  // Signal A: AI template patterns (forbidden constructions)
   let aiHits = 0;
   for (let p of AI_FORBIDDEN) { aiHits += (ft.match(p) || []).length; }
+  
+  // Signal B: Banned vocabulary (research-backed, EN+CN)
   for (let w of AI_WASTE) {
     aiHits += (ft.match(new RegExp(escRegex(w), 'gi')) || []).length;
   }
-  let deai = aiHits === 0 ? 4 : aiHits <= 2 ? 3 : aiHits <= 5 ? 1 : 0;
-  dims.push({n:'Anti-AI Voice', s:deai, m:4, d:aiHits===0?'Zero AI-template words — authentic':aiHits<=2?`${aiHits} AI-tells, acceptable`:`${aiHits} AI-template words — rewrite naturally`, icon:'🤖'});
+  
+  // Signal C: RLHF / instruction-tuning voice (2025-2026 research)
+  let rlhfHits = 0;
+  for (let [pat] of RLHF_SIGNALS) {
+    rlhfHits += (ft.match(pat) || []).length;
+  }
+  aiHits += rlhfHits;
+  
+  // Signal D: Sentence diversity + burstiness
+  let sents = body.split(/[.!?。！？\n]/).map(s => s.trim()).filter(s => s.length > 10);
+  let sentLengths = sents.map(s => s.split(/\s+/).length);
+  
+  let burstiness = 0.0;
+  if (sentLengths.length >= 4) {
+    let meanLen = sentLengths.reduce((a, b) => a + b, 0) / sentLengths.length;
+    let variance = sentLengths.reduce((s, l) => s + (l - meanLen) ** 2, 0) / sentLengths.length;
+    burstiness = Math.round(Math.sqrt(variance) * 10) / 10;
+  }
+  
+  // Simple declarative ratio (bias toward simple-sentence patterns)
+  let simpleDecl = sents.filter(s => /^.{0,5}(是|is|are|was|were)\b/.test(s)).length;
+  let sentDiversity = 1.0;
+  if (sents.length >= 4) {
+    let simpleRatio = simpleDecl / sents.length;
+    sentDiversity = Math.max(0.3, 1.0 - simpleRatio);
+  }
+  
+  // Signal E: Paragraph opener repetition
+  let paraOpeners = [];
+  for (let p of paras) {
+    let opener = p.trim().substring(0, 15).replace(/[，,.。!！?？\n]+$/, '');
+    if (opener) paraOpeners.push(opener);
+  }
+  let openerRepeats = 0;
+  if (paraOpeners.length >= 3) {
+    let oc = {};
+    paraOpeners.forEach(o => oc[o] = (oc[o] || 0) + 1);
+    openerRepeats = Object.values(oc).reduce((s, c) => s + (c > 1 ? c - 1 : 0), 0);
+  }
+  
+  // Signal F: Punctuation fingerprints (research-validated)
+  let emDashCount = (ft.match(/[—–]/g) || []).length;
+  let emDashDensity = Math.round(emDashCount / Math.max(ft.length, 1) * 500 * 10) / 10;
+  let semicolonCount = (ft.match(/;/g) || []).length;
+  let curlyQuotes = (ft.match(/[\u201c\u201d\u2018\u2019]/g) || []).length;
+  let punctScore = 1.0;  // 1.0 = clean, 0.0 = heavy AI punctuation
+  if (emDashDensity > 2) punctScore -= 0.3;
+  if (semicolonCount > 3) punctScore -= 0.3;
+  if (curlyQuotes > 2) punctScore -= 0.4;
+  punctScore = Math.max(0.0, punctScore);
+  
+  // Score synthesis (6 signals)
+  let deai;
+  if (sents.length < 4 || body.trim().length < 80) {
+    // Insufficient signal: cap at 3/4, note uncertainty
+    deai = sents.length >= 1 ? 3 : 2;
+  } else {
+    deai = 4;
+    if (aiHits > 5) deai -= 2;
+    else if (aiHits > 2) deai -= 1;
+    if (burstiness < 5 && sentLengths.length >= 4) deai -= 1;  // SD < 5 = metronomic
+    if (sentDiversity < 0.5) deai -= 1;
+    if (openerRepeats > 2) deai -= 1;
+    if (punctScore < 0.4) deai -= 1;
+  }
+  deai = Math.max(0, deai);
+  
+  // Diagnosis string
+  let reasons = [];
+  if (aiHits > 0) reasons.push(`${aiHits} AI-tells`);
+  if (burstiness < 5 && sentLengths.length >= 4)
+    reasons.push(`burstiness=${burstiness}${burstiness > 0 ? '(low)' : '(uniform)'}`);
+  if (sentDiversity < 0.7) reasons.push(`diversity=${sentDiversity.toFixed(2)}`);
+  if (openerRepeats > 0) reasons.push(`${openerRepeats} repeated openers`);
+  if (punctScore < 0.7) reasons.push(`punct=${punctScore.toFixed(2)}`);
+  
+  let deaiD = deai >= 4 ? 'Clean human voice' :
+              deai >= 3 ? 'Minor signals: ' + reasons.join(', ') :
+              deai >= 1 ? 'Mixed signals: ' + reasons.join(', ') :
+              'Heavy AI voice: ' + reasons.join(', ');
+  
+  dims.push({n:'Anti-AI Voice', s:deai, m:4, d:deaiD, icon:'🤖'});
   total += deai;
 
   let pct = Math.round(total / maxTotal * 100);
@@ -416,7 +523,15 @@ function detect(text) {
   dims.forEach(d => { if (d.s / d.m < 0.5) sugg.push({t:'fix', m:`${d.n} low: ${d.d}`}); });
   if (sugg.length < 2) sugg.push({t:'good', m:'Overall GEO-friendly. Keep publishing similar quality content.'});
 
-  return { title, total, maxTotal, pct, grade, circleCls, dims, sugg, textLength: ft.length, paraCount: paras.length, avgParaLen: Math.round(avg), dataCount: nm };
+  return { title, total, maxTotal, pct, grade, circleCls, dims, sugg, 
+           textLength: ft.length, paraCount: paras.length, avgParaLen: Math.round(avg), dataCount: nm,
+           voice_details: { ai_word_count: aiHits, rlhf_signals: rlhfHits, burstiness, 
+                            sentence_diversity: Math.round(sentDiversity * 100) / 100,
+                            sentence_count: sents.length, opener_repeats: openerRepeats,
+                            simple_declarative_pct: Math.round(simpleDecl / Math.max(sents.length, 1) * 100),
+                            punctuation: { em_dash_count: emDashCount, em_dash_per_500_chars: emDashDensity,
+                                           semicolon_count: semicolonCount, curly_quote_count: curlyQuotes,
+                                           punct_score: Math.round(punctScore * 100) / 100 } } };
 }
 
 // ── Render ──
