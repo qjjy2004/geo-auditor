@@ -1247,6 +1247,83 @@ def format_evolve_result(data: dict) -> str:
     return '\n'.join(out)
 
 
+def generate_agent_prompt(evolved: dict) -> str:
+    """Convert evolution results into an Agent-loadable writing prompt.
+    Agent feeds this as system prompt → writes content that scores high by default.
+    This is the bridge: detector experience → Agent behavior."""
+    if 'error' in evolved:
+        return f"# Evolution not ready: {evolved['error']}"
+
+    rules = evolved['evolution_rules']
+    lines = []
+
+    lines.append("# GEO Auditor — Evolved Writing Rules")
+    lines.append("# Load this as Agent system prompt. Updated: " + evolved['_meta']['evolved_at'])
+    lines.append("# Based on: " + evolved['_meta']['based_on'])
+    lines.append("")
+
+    # ── Core writing principles from proven fixes ──
+    if rules['proven_fixes']:
+        lines.append("## PROVEN WRITING PRINCIPLES (high-confidence, apply always)")
+        lines.append("")
+        dimension_principles = {
+            'Conclusion-First': '- Open with a direct answer in the first sentence. Use phrases like "Here\'s the thing:", "The short answer:", "说白了:", "说真的:". Do NOT lead with background or context.',
+            'Data Anchors': '- Include 3+ specific numbers with units (% , count, currency, years). Add 1-2 standard/source references (e.g., "per GB50981", "according to X study").',
+            'Structure': '- Use numbered lists (1. 2. 3.) or bullet points for key points. At least one section should be structured as steps.',
+            'Comparison': '- Include at least one A vs B comparison. Use "vs", "compared to", "X is 3x more than Y", or numeric contrast ("45 degrees vs 30 degrees").',
+            'FAQ Module': '- End with 2-3 Q&A pairs. Format: "Q: [question] A: [answer]". Use questions real readers would search for.',
+            'Title Quality': '- Title must include: search intent word (how/what/why/guide) + core topic keyword + a number.',
+            'Keyword Density': '- Ensure 2-3 core topic terms appear 3-5 times each, naturally spread throughout the text.',
+            'Sources': '- Cite at least 2 verifiable sources. Mention specific standards, studies, reports, or data origins.',
+            'CTA': '- End with one call-to-action: invite contact, offer review, suggest next step.',
+            'Entity Info': '- Include in early paragraphs: a location name (city/province), an organization/company name, and a time reference.',
+            'EEAT': '- Establish authority: mention years of experience + a credential/certification + a third-party validation (test report, inspection result).',
+            'Semantic Match': '- Ensure the body directly answers the question in the title. Use title keywords in the first paragraph.',
+        }
+        for pf in rules['proven_fixes']:
+            if pf['dimension'] in dimension_principles:
+                lines.append(f"### {pf['dimension']} ({pf['success_rate']}% effective, +{pf['avg_gain']} avg gain)")
+                lines.append(dimension_principles[pf['dimension']])
+                lines.append("")
+
+    # ── Anti-AI Voice rules ──
+    lines.append("## VOICE RULES — Avoid these AI patterns")
+    lines.append("")
+    lines.append("BANNED WORDS (never use): delve, leverage, utilize, robust, comprehensive, streamline, foster, facilitate, pivotal, nuanced, multifaceted, showcase, underscore, garner, notable, furthermore, moreover, consequently, nevertheless, in conclusion, it is worth noting, a myriad of, a plethora of, in the realm of")
+    lines.append("")
+    lines.append("BANNED PHRASES (never use): 'Let me walk you through', 'Great question!', 'On one hand...on the other', 'Here's how I'd think about it', 'Happy to jump on a call', 'As of my training cutoff'")
+    lines.append("")
+    lines.append("PUNCTUATION: Avoid em dashes (max 1 per 500 words). No semicolons in casual writing. Use straight quotes, not curly/smart quotes.")
+    lines.append("")
+    lines.append("RHYTHM: Vary sentence length. Mix short punchy sentences (3-8 words) with longer flowing ones (15-25 words). No metronomic uniform length.")
+    lines.append("")
+
+    # ── Stale dimensions (don't waste time on these) ──
+    if rules['stale_dimensions']:
+        lines.append("## DEPRIORITIZE — These rarely improve with rewriting")
+        for sd in rules['stale_dimensions']:
+            lines.append(f"- {sd['dimension']}: {sd['success_rate']}% success rate. Focus energy elsewhere.")
+        lines.append("")
+
+    # ── Priority order ──
+    if evolved.get('priority_hints'):
+        lines.append("## REWRITE PRIORITY (fix in this order)")
+        for i, dim in enumerate(evolved['priority_hints'][:5], 1):
+            lines.append(f"{i}. {dim}")
+        lines.append("")
+
+    # ── Score targets ──
+    lines.append("## SCORE TARGETS")
+    lines.append("- Aim for: 80+ (A-grade or better)")
+    lines.append("- Anti-AI Voice: maintain 3+/4 (keep it human-sounding)")
+    lines.append("- EEAT: maintain 6+/8 (credentials + experience + validation)")
+    lines.append("")
+
+    lines.append("# End of evolved rules. Apply these and re-detect to verify improvement.")
+
+    return '\n'.join(lines)
+
+
 def format_learn(learn: dict) -> str:
     """Human-readable learning output"""
     out = []
@@ -1473,6 +1550,8 @@ Config file format (geo_auditor.json):
                         help='Generate LLM-ready prompt: suggests 3 rewrites per AI-flagged sentence')
     parser.add_argument('--evolve', action='store_true',
                         help='Analyze evolution log, output evolved detector config with proven fixes')
+    parser.add_argument('--agent-prompt', action='store_true',
+                        help='Generate Agent-loadable writing prompt from evolution data')
     parser.add_argument('--evolution-log', action='store_true',
                         help='Show detector self-evolution trajectory (score timeline + top improvements)')
     parser.add_argument('--version', '-v', action='version', version=f'GEO Auditor v{VERSION}')
@@ -1507,12 +1586,19 @@ Config file format (geo_auditor.json):
         return
 
     # ── Evolution commands ──
-    if args.evolve:
+    if args.evolve or args.agent_prompt:
         result = evolve_detector()
+        if args.agent_prompt:
+            print(generate_agent_prompt(result))
+            return
+        # Inject agent prompt into JSON output
+        result['agent_prompt'] = generate_agent_prompt(result)
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
             print(format_evolve_result(result))
+            print("\n" + "─" * 50)
+            print("# Agent prompt saved. Use --agent-prompt to export.")
         return
 
     if args.evolution_log:
