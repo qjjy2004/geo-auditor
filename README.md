@@ -115,7 +115,7 @@ STALE (don't waste time):
 ## Install
 
 ```bash
-git clone https://github.com/liangjia-tech/geo-auditor.git
+git clone https://github.com/qjjy2004/geo-auditor.git
 cd geo-auditor
 
 # CLI: Python 3.7+, zero dependencies
