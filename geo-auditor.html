@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO Auditor · 工业品 AI 搜索内容检测器</title>
+<style>
+:root {
+  --bg: #0d1117; --card: #161b22; --bd: #30363d; --tx: #c9d1d9;
+  --mu: #8b949e; --ac: #58a6ff; --dn: #f85149; --gn: #3fb950; --or: #d2991d;
+}
+* { margin:0;padding:0;box-sizing:border-box }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--tx); min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+}
+.container { width: 100%; max-width: 800px; padding: 20px; }
+header {
+  text-align: center; padding: 30px 0 20px;
+  border-bottom: 1px solid var(--bd); margin-bottom: 24px;
+}
+header h1 { font-size: 1.6em; color: #fff; }
+header p { font-size: .85em; color: var(--mu); margin-top: 6px; }
+.badges { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.badge {
+  font-size: 11px; padding: 3px 10px; border-radius: 12px;
+  background: rgba(88,166,255,.1); color: var(--ac); border: 1px solid rgba(88,166,255,.2);
+}
+textarea {
+  width: 100%; height: 260px; background: var(--card); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 16px; font-size: 14px; line-height: 1.7;
+  color: var(--tx); font-family: inherit; resize: vertical;
+}
+textarea:focus { outline: none; border-color: var(--ac); }
+.btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn {
+  padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; transition: .2s;
+}
+.btn-ac { background: var(--ac); color: #fff; }
+.btn-ac:hover { background: #79c0ff; }
+.btn-out {
+  background: transparent; border: 1px solid var(--bd); color: var(--tx);
+}
+.btn-out:hover { background: rgba(255,255,255,.05); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.result { display: none; margin-top: 20px; }
+.score-circle {
+  width: 90px; height: 90px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 1.6em; font-weight: 700;
+  margin: 0 auto 16px;
+}
+.s-great { background: #2d6a4f; color: #fff; }
+.s-good  { background: #40916c; color: #fff; }
+.s-ok    { background: rgba(210,153,29,.2); color: #d2991d; border: 2px solid #d2991d; }
+.s-poor  { background: rgba(248,81,73,.2); color: #f85149; border: 2px solid #f85149; }
+.grade { text-align: center; font-size: 1em; margin-bottom: 20px; color: var(--mu); }
+.stats { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+.stat {
+  background: var(--card); border: 1px solid var(--bd); border-radius: 6px;
+  padding: 10px 18px; text-align: center; min-width: 80px;
+}
+.stat-num { font-size: 1.3em; font-weight: 700; }
+.stat-label { font-size: .75em; color: var(--mu); }
+.dim-section { margin-bottom: 16px; }
+.dim-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid rgba(48,54,61,.4); font-size: 13px;
+}
+.dim-item:last-child { border: none; }
+.dim-icon { font-size: 1em; width: 24px; text-align: center; flex-shrink: 0; }
+.dim-name { width: 105px; font-weight: 500; flex-shrink: 0; }
+.dim-score { width: 44px; text-align: right; font-weight: 600; flex-shrink: 0; }
+.dim-bar { flex: 1; height: 5px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+.dim-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.dim-desc { font-size: 12px; color: var(--mu); padding: 2px 0 8px 34px; }
+.sug { font-size: 12px; padding: 6px 10px; margin: 4px 0; border-radius: 4px; }
+.sug.fix { background: rgba(248,81,73,.06); border-left: 2px solid var(--dn); }
+.sug.good { background: rgba(63,185,80,.06); border-left: 2px solid var(--gn); }
+.sug.tip { background: rgba(210,153,29,.06); border-left: 2px solid var(--or); }
+.tabs { display: flex; gap: 2px; margin-bottom: 16px; }
+.tab {
+  padding: 8px 16px; border: none; background: transparent; color: var(--mu);
+  cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent;
+}
+.tab.active { color: var(--ac); border-bottom-color: var(--ac); }
+.hist-list { max-height: 400px; overflow-y: auto; }
+.hist-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px;
+  border-bottom: 1px solid rgba(48,54,61,.3); cursor: pointer; font-size: 13px;
+  transition: background .15s;
+}
+.hist-row:hover { background: rgba(255,255,255,.03); }
+.hist-score { width: 50px; text-align: center; font-weight: 700; font-size: 1.1em; }
+.hist-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-date { color: var(--mu); font-size: 11px; white-space: nowrap; }
+.toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;
+  z-index: 9999; pointer-events: none; opacity: 0; transition: opacity .3s;
+}
+.toast.show { opacity: 1; }
+footer {
+  text-align: center; padding: 30px; color: var(--mu); font-size: 12px;
+  border-top: 1px solid var(--bd); margin-top: 40px;
+}
+footer a { color: var(--ac); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>GEO Auditor</h1>
+    <p>14 维度检测 — 不只是 GEO，同时查「AI 腔」· 专为工程/建筑行业</p>
+    <div class="badges">
+      <span class="badge">去 AI 化检测</span>
+      <span class="badge">工程行业垂直</span>
+      <span class="badge">Agent 可调用</span>
+      <span class="badge">本地运行</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('check')">检测</button>
+    <button class="tab" onclick="showTab('history')">历史</button>
+  </div>
+
+  <!-- 检测面板 -->
+  <div id="checkPanel">
+    <textarea id="contentInput" placeholder="粘贴你要检测的内容...
+第一行建议写标题。
+
+示例：抗震支架怎么验收？监理最看重的3个标准"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-ac" onclick="runCheck()">开始检测</button>
+      <button class="btn btn-out btn-sm" onclick="loadSample()">加载示例</button>
+      <button class="btn btn-out btn-sm" onclick="clearInput()">清空</button>
+      <button class="btn btn-out btn-sm" id="copyBtn" onclick="copyResult()" style="display:none">复制结果</button>
+    </div>
+    <div class="result" id="resultPanel">
+      <div id="resultContent"></div>
+    </div>
+  </div>
+
+  <!-- 历史面板 -->
+  <div id="historyPanel" style="display:none;">
+    <div class="hist-list" id="histList"><p style="color:var(--mu);text-align:center;padding:30px">暂无检测记录</p></div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-out btn-sm" onclick="clearHistory()">清空历史</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="https://github.com/liangjia-tech/geo-auditor" target="_blank">GitHub</a> · 
+  <a href="https://zhibi.xyz" target="_blank">良佳科技</a> · 
+  MIT License
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// GEO Auditor v1.0 — 14维检测引擎
+// 工业品AI搜索内容检测器
+// 支持Agent调用: window.GEOAuditor.detect(text)
+// ══════════════════════════════════════════
+
+// 行业关键词 — 修改这里适配你的行业
+const INDUSTRY_KW = [
+  '抗震支架','抗震支吊架','建筑机电','GB50981','验收',
+  '安装','锚栓','斜撑','螺栓','扭矩','槽钢','支吊架',
+  '机电抗震','抗震','工程','施工','监理','甲方'
+];
+
+const ENTITY_PATTERNS = [
+  /省|市|区|县|江苏|浙江|广东|北京|上海|深圳|南京|杭州|广州|安徽|山东|河南|河北|湖北|湖南|四川|重庆/,
+  /医院|学校|厂房|高铁|地铁|机场|商场|住宅|酒店|办公|停车/,
+  /公司|厂|集团|院|局|所|中心|站|队/
+];
+
+const AI_FORBIDDEN = [
+  /不是.{0,15}而是/g, /并非.{0,10}而是/g,
+  /不仅是.{0,10}更是/g, /与其说.{0,10}不如说/g
+];
+
+const AI_WASTE = [
+  '此外','而且','因此','然而','综上所述','可以说','在某种程度上',
+  '往往','一定的','值得注意的是','更为关键的是','总而言之',
+  '众所周知','不可否认','毋庸置疑','总的来看','总的来讲'
+];
+
+// ── 核心检测引擎 ──
+function detect(text) {
+  const lines = text.split('\n');
+  const title = (lines[0] || '').length < 80 ? lines[0] : '';
+  const body = title ? lines.slice(1).join('\n') : text;
+  const ft = text;
+  let dims = [], total = 0, maxTotal = 100;
+
+  // 1. 结论前置 10
+  let firstPara = (body.trim().split('\n')[0] || '').substring(0, 120);
+  let hasConclusion = /答案|结论|核心|关键|说白了|说真的|直接|就是/.test(firstPara) && firstPara.length >= 25;
+  let cf = hasConclusion ? 10 : firstPara.length >= 20 ? 6 : 2;
+  dims.push({n:'结论前置', s:cf, m:10, d:cf>=9?'首段结论明确，AI可直接提取':cf>=5?'有开篇但不够直接，建议第一句给答案':'缺结论——AI偏好第一段直接说答案', icon:'📍'});
+  total += cf;
+
+  // 2. 数据锚点 10
+  let nm = (ft.match(/\d+\.?\d*\s*(亿|万|千|百|元|套|个|次|年|月|日|%|mm|cm|m|kg|t|℃|μm|条|家|N·m|kN)/g) || []).length;
+  let sm = (ft.match(/GB\s*\d|ISO\s*\d|TCECS|标准|规范|第.*条/g) || []).length;
+  let da = nm >= 4 && sm >= 2 ? 10 : nm >= 3 ? 7 : nm >= 2 ? 5 : nm >= 1 ? 2 : 0;
+  dims.push({n:'数据锚点', s:da, m:10, d:`${nm}个数据+${sm}条规范。${da>=9?'优秀':da>=5?'不错':'偏少，加具体数字'}`, icon:'📊'});
+  total += da;
+
+  // 3. 步骤/结构化 8
+  let st = (body.match(/第[一二三四五六七八九十\d]|步骤|首先|然后|其次|最后|第一|第二|第三|\d+[\.、\)]\s*\S/g) || []).length;
+  let bu = (body.match(/^[\-\*•]\s/gm) || []).length;
+  let ss = st + bu >= 4 ? 8 : st + bu >= 2 ? 6 : st + bu >= 1 ? 3 : 1;
+  dims.push({n:'步骤/结构化', s:ss, m:8, d:`${st}步骤+${bu}列表。${ss>=7?'结构清晰':ss>=4?'有基础':'缺分点分步'}`, icon:'🔢'});
+  total += ss;
+
+  // 4. 对比结构 8
+  let cm = (ft.match(/vs|对比|相比|不同于|区别|差异|比.*更|而不是|而非|优于|不如|达标.*翻车|合格.*不合格/g) || []).length;
+  let cs = cm >= 3 ? 8 : cm >= 1 ? 5 : 2;
+  dims.push({n:'对比结构', s:cs, m:8, d:`${cm}处对比。${cs>=7?'充足':cs>=4?'有1-2处':'缺对比，加A vs B'}`, icon:'⚖️'});
+  total += cs;
+
+  // 5. FAQ模块 8
+  let qa = (body.match(/Q[：:]|问[：:]|A[：:]|答[：:]|Q&A|常见问题|FAQ/gi) || []).length;
+  let qs = qa >= 4 ? 8 : qa >= 2 ? 6 : qa >= 1 ? 3 : 1;
+  dims.push({n:'FAQ模块', s:qs, m:8, d:`${qa}个Q&A标记。${qs>=6?'FAQ丰富':qs>=3?'有但可补':'无FAQ，加2-3个问答匹配AI搜索'}`, icon:'❓'});
+  total += qs;
+
+  // 6. 标题质量 8
+  let hk = title.length > 0,
+      hi = /怎么|如何|什么|哪|为什么|多少|吗|教程|指南|攻略|方法|技巧|案例|实录/.test(title),
+      hn = /\d/.test(title);
+  let tq = hk && hi && hn ? 8 : hk && hi ? 6 : hk && hn ? 5 : hk ? 3 : 1;
+  dims.push({n:'标题质量', s:tq, m:8, d:tq>=7?'标题含搜索词+数字':tq>=5?'不错，加个数字更佳':tq>=2?'缺搜索意图':'无有效标题', icon:'📌'});
+  total += tq;
+
+  // 7. 关键词密度 8 (行业词优先)
+  let kwScore = 0, kwTop = '';
+  for (let kw of INDUSTRY_KW) {
+    let re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    let c = (ft.match(re) || []).length;
+    if (c >= 3) { kwScore = 8; kwTop = kw; break; }
+    else if (c >= 1 && kwScore < 5) { kwScore = 5; kwTop = kw; }
+  }
+  if (!kwScore) { kwScore = 2; kwTop = '(无)'; }
+  dims.push({n:'关键词密度', s:kwScore, m:8, d:kwScore>=7?`核心词"${kwTop}"充分覆盖`:kwScore>=4?`"${kwTop}"出现不足，目标3-5次`:'行业核心词缺失', icon:'🔑'});
+  total += kwScore;
+
+  // 8. 段落长度 6
+  let paras = body.split('\n\n').filter(p => p.trim());
+  let avg = paras.reduce((s, p) => s + p.length, 0) / Math.max(paras.length, 1);
+  let pl = avg >= 30 && avg <= 150 ? 6 : avg >= 15 && avg <= 300 ? 4 : 2;
+  dims.push({n:'段落长度', s:pl, m:6, d:`平均${Math.round(avg)}字/段。${pl>=5?'适中友好':pl>=3?'偏长或偏短':'段落需调整'}`, icon:'📏'});
+  total += pl;
+
+  // 9. 引用可追溯 6
+  let rf = (ft.match(/GB\s*\d+|ISO\s*\d+|TCECS|第\d+\.\d+\.\d+条|据.*显示|参考|来源|检测报告|型式检验/g) || []).length;
+  let rs = rf >= 3 ? 6 : rf >= 1 ? 4 : 1;
+  dims.push({n:'引用可追溯', s:rs, m:6, d:`${rf}处可验证来源。${rs>=5?'可信度高':rs>=3?'有引用可加强':'缺规范编号或来源'}`, icon:'📖'});
+  total += rs;
+
+  // 10. CTA号召 4
+  let ct = (ft.match(/私信|联系|咨询|关注|扫描|点击|评论|加微信|打电话|聊聊/g) || []).length;
+  let cc = ct >= 1 ? 4 : 1;
+  dims.push({n:'CTA号召', s:cc, m:4, d:ct>=1?'有引导互动':'缺CTA——文末加一句引导', icon:'🎯'});
+  total += cc;
+
+  // 11. 实体信息 8
+  let entScore = 0;
+  for (let p of ENTITY_PATTERNS) { if (p.test(ft)) entScore++; }
+  if (entScore >= 3) entScore = 8;
+  else if (entScore >= 2) entScore = 6;
+  else if (entScore >= 1) entScore = 3;
+  else entScore = 1;
+  dims.push({n:'实体信息', s:entScore, m:8, d:entScore>=6?'地名/机构/角色信息丰富':entScore>=3?'有基础地域信息':'缺地名和机构信息——AI无法地理匹配', icon:'🏢'});
+  total += entScore;
+
+  // 12. EEAT权威度 8
+  let eeat = 0;
+  if (/10年|12年|\d+年.*经验|做过|干过|跑过|做过.*项目/.test(ft)) eeat += 3;
+  if (/GB\s*\d|TCECS|型式检验|检测报告|第三方|规范/.test(ft)) eeat += 3;
+  if (eeat > 5) eeat = 8;
+  else if (eeat > 2) eeat = 5;
+  else eeat = 2;
+  dims.push({n:'EEAT权威度', s:eeat, m:8, d:eeat>=7?'经验+专业+权威均衡':eeat>=4?'有经验但缺权威背书':'缺行业经验或规范引用，EEAT弱', icon:'🛡️'});
+  total += eeat;
+
+  // 13. 语义匹配 4
+  let sem = 0;
+  if (/为什么|怎么|如何|什么|哪|多少|吗/.test(title)) sem += 2;
+  if (/因为|所以|原因|答案|关键|核心/.test(body.substring(0, 200))) sem += 2;
+  dims.push({n:'语义匹配', s:sem, m:4, d:sem>=3?'标题和内容意图一致':sem>=1?'部分匹配，可加强':'标题和内容意图脱节', icon:'🎯'});
+  total += sem;
+
+  // 14. 去AI化 4
+  let aiHits = 0;
+  for (let p of AI_FORBIDDEN) { aiHits += (ft.match(p) || []).length; }
+  for (let w of AI_WASTE) {
+    let re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    aiHits += (ft.match(re) || []).length;
+  }
+  let deai = aiHits === 0 ? 4 : aiHits <= 2 ? 3 : aiHits <= 5 ? 1 : 0;
+  dims.push({n:'去AI化', s:deai, m:4, d:aiHits===0?'零AI模板词，纯人声':aiHits<=2?`${aiHits}处AI腔，可接受`:`${aiHits}处AI模板词——换口语表达`, icon:'🤖'});
+  total += deai;
+
+  let pct = Math.round(total / maxTotal * 100);
+  let grade = pct >= 85 ? 'S' : pct >= 70 ? 'A' : pct >= 50 ? 'B' : 'C';
+  let circleCls = grade === 'S' ? 's-great' : grade === 'A' ? 's-good' : grade === 'B' ? 's-ok' : 's-poor';
+  let sugg = [];
+  dims.forEach(d => { if (d.s / d.m < 0.5) sugg.push({t:'fix', m:`${d.n}得分偏低：${d.d}`}); });
+  if (sugg.length < 2) sugg.push({t:'good', m:'整体GEO友好度良好，持续发布同类内容可逐步提升AI引用率'});
+
+  return { title, total, maxTotal, pct, grade, circleCls, dims, sugg, textLength: ft.length, paraCount: paras.length, avgParaLen: Math.round(avg), dataCount: nm };
+}
+
+// ── 运行检测 ──
+function runCheck() {
+  const text = document.getElementById('contentInput').value.trim();
+  if (!text) { toast('请先粘贴内容'); return; }
+  const r = detect(text);
+  renderResult(r);
+  saveToHistory(r);
+  document.getElementById('copyBtn').style.display = 'inline-flex';
+  window._lastResult = r;
+}
+
+function renderResult(r) {
+  const d = r;
+  let html = `
+    <div class="${d.circleCls} score-circle">${d.pct}%</div>
+    <div class="grade">${d.grade==='S'?'🏆 完美':d.grade==='A'?'✅ 优秀':d.grade==='B'?'⚠️ 可优化':'❌ 需重写'} · ${d.total}/${d.maxTotal}分</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-num">${d.textLength}</div><div class="stat-label">字符数</div></div>
+      <div class="stat"><div class="stat-num">${d.paraCount}</div><div class="stat-label">段落数</div></div>
+      <div class="stat"><div class="stat-num">${d.avgParaLen}</div><div class="stat-label">均段长</div></div>
+      <div class="stat"><div class="stat-num">${d.dataCount}</div><div class="stat-label">数据锚点</div></div>
+    </div>
+    ${d.dims.map(di => `
+      <div class="dim-item">
+        <span class="dim-icon">${di.icon}</span>
+        <span class="dim-name">${di.n}</span>
+        <div class="dim-bar"><div class="dim-fill" style="width:${di.s/di.m*100}%;background:${di.s/di.m>=0.7?'#3fb950':di.s/di.m>=0.4?'#d2991d':'#f85149'}"></div></div>
+        <span class="dim-score">${di.s}/${di.m}</span>
+      </div>
+      <div class="dim-desc">${di.d}</div>
+    `).join('')}
+    <h4 style="margin-top:16px;font-size:14px;color:#fff">💡 优化建议</h4>
+    ${d.sugg.map(s => `<div class="sug ${s.t}">${s.m}</div>`).join('')}
+  `;
+  document.getElementById('resultContent').innerHTML = html;
+  document.getElementById('resultPanel').style.display = 'block';
+  document.getElementById('resultPanel').scrollIntoView({behavior: 'smooth'});
+}
+
+// ── 复制结果 ──
+function copyResult() {
+  if (!window._lastResult) return;
+  const r = window._lastResult;
+  let text = 'GEO Auditor 检测结果\n';
+  text += '总分: ' + r.total + '/' + r.maxTotal + ' (' + r.pct + '%) 等级: ' + r.grade + '\n';
+  text += '────────────────\n';
+  r.dims.forEach(d => { text += d.icon + ' ' + d.n + ': ' + d.s + '/' + d.m + ' ' + d.d + '\n'; });
+  text += '────────────────\n';
+  r.sugg.forEach(s => { text += (s.t==='fix'?'[修复] ':'[建议] ') + s.m + '\n'; });
+  navigator.clipboard.writeText(text).then(() => {
+    toast('✅ 已复制检测结果');
+  }).catch(() => toast('复制失败，请手动选择'));
+}
+
+// ── 示例 ──
+function loadSample() {
+  document.getElementById('contentInput').value = `抗震支架怎么验收？监理最看重的3个标准
+
+做了12年抗震支架，验收现场跑了不下200次。监理最常卡的其实就3个地方，今天一次说清楚。
+
+第一，预埋件偏差。验收标准是水平偏差不超过±5mm，垂直偏差不超过±3mm。我们在宿迁某医院项目遇到过——预埋件偏了8mm，监理当场要求返工。解决办法：预埋后用激光水平仪复测，别省这5分钟。
+
+第二，支架间距超标。根据GB 50981-2014第4.3.2条，抗震支架间距不应大于设计值的1.2倍。很多施工队为了省料把间距拉到1.5倍，验收一量就翻车。
+
+第三，防腐处理不到位。2026年新规明确要求：所有外露金属件必须做热浸镀锌处理，镀锌层厚度≥65μm。喷漆的、冷镀的、薄镀的——全都不合格。
+
+Q：抗震支架必须找专业公司验收吗？
+A：是的。监理会查安装单位的资质和人员的特种作业证书。自己装的必须补。
+Q：验收不过怎么办？
+A：整改通知单下来有7天整改期。建议提前自检，别等监理来才发现问题。
+
+有项目需要咨询验收？12年江苏本地经验，私信我。`;
+}
+
+function clearInput() {
+  document.getElementById('contentInput').value = '';
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('copyBtn').style.display = 'none';
+}
+
+// ── Tabs ──
+function showTab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('checkPanel').style.display = t === 'check' ? 'block' : 'none';
+  document.getElementById('historyPanel').style.display = t === 'history' ? 'block' : 'none';
+  if (t === 'history') loadHistory();
+}
+
+// ── 历史 (localStorage) ──
+const HIST_KEY = 'geo_auditor_history';
+const MAX_HIST = 50;
+
+function saveToHistory(r) {
+  const text = document.getElementById('contentInput').value.trim();
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) { hist = []; }
+  hist.unshift({
+    id: Date.now(),
+    title: (r.title || '(无标题)').substring(0, 60),
+    score: r.pct,
+    grade: r.grade,
+    time: new Date().toLocaleString('zh-CN'),
+    text: text.substring(0, 300),
+    dims: r.dims.map(d => ({n: d.n, s: d.s, m: d.m, icon: d.icon}))
+  });
+  if (hist.length > MAX_HIST) hist = hist.slice(0, MAX_HIST);
+  try {
+    localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+  } catch(e) {
+    hist = hist.slice(0, 25);
+    localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+  }
+}
+
+function loadHistory() {
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) {}
+  const el = document.getElementById('histList');
+  if (!hist.length) { el.innerHTML = '<p style="color:var(--mu);text-align:center;padding:30px">暂无检测记录</p>'; return; }
+  el.innerHTML = hist.map(r => {
+    let clr = r.score >= 85 ? '#3fb950' : r.score >= 70 ? '#58a6ff' : r.score >= 50 ? '#d2991d' : '#f85149';
+    return `<div class="hist-row" onclick="viewHistory(${r.id})">
+      <span class="hist-score" style="color:${clr}">${r.score}%</span>
+      <span class="hist-title">${esc(r.title)}</span>
+      <span class="hist-date">${r.time}</span>
+    </div>`;
+  }).join('');
+}
+
+function viewHistory(id) {
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e) {}
+  const entry = hist.find(h => h.id === id);
+  if (!entry) return;
+  document.getElementById('contentInput').value = entry.text;
+  // 重建检测结果
+  let r = detect(entry.text);
+  renderResult(r);
+  document.getElementById('copyBtn').style.display = 'inline-flex';
+  window._lastResult = r;
+  showTab('check');
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  document.querySelectorAll('.tab')[1].classList.remove('active');
+  document.getElementById('checkPanel').style.display = 'block';
+  document.getElementById('historyPanel').style.display = 'none';
+}
+
+function clearHistory() {
+  if (confirm('确认清空所有检测历史？')) {
+    localStorage.removeItem(HIST_KEY);
+    loadHistory();
+    toast('历史已清空');
+  }
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Toast ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ══════════════════════════════════════════
+// Agent API — 供外部程序调用
+// 用法: window.GEOAuditor.detect("文本内容")
+// 返回: 完整的检测结果对象
+// ══════════════════════════════════════════
+window.GEOAuditor = {
+  detect: detect,
+  version: '1.0.0',
+  INDUSTRY_KW: INDUSTRY_KW,
+  // 方便Agent获取检测摘要
+  summarize: function(text) {
+    const r = detect(text);
+    return {
+      score: r.pct,
+      grade: r.grade,
+      total: r.total + '/' + r.maxTotal,
+      weakDims: r.dims.filter(d => d.s / d.m < 0.5).map(d => d.n),
+      topIssues: r.sugg.filter(s => s.t === 'fix').map(s => s.m)
+    };
+  }
+};
+</script>
+</body>
+</html>

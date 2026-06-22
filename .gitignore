@@ -1,0 +1,4 @@
+# 本地测试产品
+*.pyc
+__pycache__/
+.DS_Store
