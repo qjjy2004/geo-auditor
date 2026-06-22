@@ -753,35 +753,38 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     dims.append({'n': 'Anti-AI Voice', 's': deai, 'm': 4, 'd': deai_d, 'icon': '🤖'})
     total += deai
 
-    # ── Apply evolved weights (detection feedback loop) ──
-    # stale dims (weight=0): replace score with neutral value — don't penalize
-    # proven dims (weight=0.5): floor score at 70% of max — don't nag about wins
-    # fragile/unmentioned (weight=1.0): unchanged
+    # ── Apply evolved weights as true multipliers (v0.6.3 refactor) ──
+    # Learning weights range 0.75–1.25, applied as score * weight.
+    # Raw scores are preserved unchanged. Adaptive score uses weighted average.
+    # This replaces the old floor/cap manipulation (stale→60%max, proven→70%min).
     evolved_adjustments = []
+    weighted_total = 0.0
+    weighted_max_total = 0.0
+    raw_total = sum(d['s'] for d in dims)
+
     for d in dims:
         w = evolved_weights.get(d['n'], 1.0)
-        if w == 0.0:
-            # Stale: never improves — neutralize to default median
-            neutral = round(d['m'] * 0.6)
+        ratio = d['s'] / max(d['m'], 1)
+        weighted_total += ratio * w * d['m']
+        weighted_max_total += w * d['m']
+
+        if w != 1.0:
+            d['_weight'] = w
             d['_original_score'] = d['s']
-            d['_weight'] = 0.0
-            d['s'] = neutral
-            d['d'] = f'[Evolved: skipped — rarely improves] {d["d"]}'
+            label = '↓' if w < 1.0 else '↑'
+            d['d'] = f'[Evolved: weight={w:.2f}{label}] {d["d"]}'
             evolved_adjustments.append(d['n'])
-        elif w == 0.5:
-            # Proven: Agent has internalized — floor at 70%, don't nag
-            floor = round(d['m'] * 0.7)
-            d['_original_score'] = d['s']
-            d['_weight'] = 0.5
-            d['s'] = max(d['s'], floor)
-            if d['_original_score'] >= floor:
-                d['d'] = f'[Evolved: proven strength] {d["d"]}'
 
-    # Recalculate total with adjusted scores
-    total = sum(d['s'] for d in dims)
+    # Raw percentage (content quality, independent of evolution)
+    raw_pct = round(raw_total / max_total * 100)
 
-    # Summary
-    pct = round(total / max_total * 100)
+    # Adaptive percentage (learning-weighted)
+    adaptive_total = round(weighted_total)
+    adaptive_pct = round(weighted_total / weighted_max_total * 100) if weighted_max_total > 0 else raw_pct
+
+    # Primary display uses adaptive score; raw available for comparison
+    total = adaptive_total
+    pct = adaptive_pct
     if pct >= 85: grade = 'S'
     elif pct >= 70: grade = 'A'
     elif pct >= 50: grade = 'B'
@@ -790,8 +793,7 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
     # Structured rewrite hints for Agent
     rewrite_hints = []
     for d in dims:
-        w = evolved_weights.get(d['n'], 1.0)
-        if w > 0 and d['s'] / d['m'] < 0.5:
+        if d['s'] / d['m'] < 0.5:
             rewrite_hints.append(generate_rewrite_hint(d['n'], d['s'], d['m'], d['d']))
 
     # Text suggestions (human-readable)
@@ -808,6 +810,8 @@ def detect(text: str, config: Config = None, evolved_weights: dict = None) -> di
         'total': total,
         'maxTotal': max_total,
         'pct': pct,
+        'raw_pct': raw_pct,
+        'adaptive_pct': adaptive_pct,
         'grade': grade,
         'dimensions': dims,
         'suggestions': sugg,
@@ -1067,9 +1071,15 @@ def log_compare(before: dict, after: dict, cmp: dict):
         pass
 
 
-def evolve_detector(min_entries: int = 5) -> dict:
-    """Analyze evolution log and produce an evolved config.
-    Learns from rewrite experiences: which fixes actually worked."""
+def evolve_detector(min_entries: int = 5, recent_window: int = 30) -> dict:
+    """Analyze evolution log and produce evolved dimension weights.
+    
+    v0.6.3 refactor (GPT audit): Learns from BOTH detection scores AND rewrite outcomes.
+    - Detections tell us: which dimensions are missing signals, have low scores, are volatile
+    - Rewrites tell us: which dimensions actually improve with editing
+    
+    Weights range 0.75–1.25, applied as multipliers (not floor/cap manipulation).
+    """
     entries = []
     corrupt_lines = 0
     try:
@@ -1088,7 +1098,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
     detections = [e for e in entries if e.get('type') != 'rewrite']
 
     if corrupt_lines > 0:
-        print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log", file=sys.stderr)
+        _safe_print(f"Warning: skipped {corrupt_lines} corrupt line(s) in evolution log")
 
     if len(rewrites) < min_entries:
         return {
@@ -1097,92 +1107,163 @@ def evolve_detector(min_entries: int = 5) -> dict:
             'detections_count': len(detections),
         }
 
-    # ── Learn from rewrite experiences ──
-    fix_effectiveness = {}  # dimension → {successes, attempts, avg_gain}
-    time_decay = {}  # dimension → last_seen_ts
+    # Only consider recent window (time-decay by recency)
+    rewrites = rewrites[-recent_window:]
+    detections = detections[-recent_window:]
 
+    # ── Per-dimension stats from BOTH sources ──
+    # detection stats: observations, zero_signal count, ratio list (for mean+variance)
+    # rewrite stats: attempts, successes, total_delta
+    dim_stats = {}  # dim_name → dict
+
+    def _init_dim():
+        return {
+            'observations': 0,
+            'zero_signal': 0,
+            'ratios': [],
+            'rw_attempts': 0,
+            'successes': 0,
+            'total_delta': 0,
+        }
+
+    # From detections: collect score ratios per dimension
+    for det in detections:
+        for d in det.get('dimensions', []):
+            name = d['n']
+            if name not in dim_stats:
+                dim_stats[name] = _init_dim()
+            dim_stats[name]['observations'] += 1
+            score, mx = d.get('s', 0), d.get('m', 1)
+            ratio = score / max(mx, 1)
+            dim_stats[name]['ratios'].append(ratio)
+            if ratio < 0.1:
+                dim_stats[name]['zero_signal'] += 1
+
+    # From rewrites: track which dimensions improved/worsened
     for rw in rewrites:
         for dim in rw.get('improved', []):
-            if dim not in fix_effectiveness:
-                fix_effectiveness[dim] = {'successes': 0, 'attempts': 0, 'total_gain': 0, 'failures': 0}
-            fix_effectiveness[dim]['successes'] += 1
-            fix_effectiveness[dim]['attempts'] += 1
-            fix_effectiveness[dim]['total_gain'] += rw['gains'].get(dim, 0)
+            if dim not in dim_stats:
+                dim_stats[dim] = _init_dim()
+            dim_stats[dim]['rw_attempts'] += 1
+            dim_stats[dim]['successes'] += 1
+            dim_stats[dim]['total_delta'] += rw.get('gains', {}).get(dim, 0)
         for dim in rw.get('worsened', []):
-            if dim not in fix_effectiveness:
-                fix_effectiveness[dim] = {'successes': 0, 'attempts': 0, 'total_gain': 0, 'failures': 0}
-            fix_effectiveness[dim]['attempts'] += 1
-            fix_effectiveness[dim]['failures'] += 1
+            if dim not in dim_stats:
+                dim_stats[dim] = _init_dim()
+            dim_stats[dim]['rw_attempts'] += 1
 
-    # ── Build evolved rules ──
-    proven_fixes = []   # High-success-rate dimensions → lock the fix
-    fragile_fixes = []  # Mixed results → need better technique
-    stale_dims = []     # Never improved → consider ignoring
+    # ── Classify each dimension ──
+    proven_fixes = []
+    fragile_fixes = []
+    stale_dims = []
+    insufficient = []
+    evolved_dim_weights = {}
 
-    for dim, stats in fix_effectiveness.items():
-        if stats['attempts'] == 0:
-            continue
-        success_rate = stats['successes'] / stats['attempts']
-        avg_gain = stats['total_gain'] / max(stats['successes'], 1)
+    for dim, stats in dim_stats.items():
+        obs = stats['observations']
+        missing_rate = stats['zero_signal'] / max(obs, 1)
+        ratios = stats['ratios']
+        mean_ratio = sum(ratios) / max(len(ratios), 1)
+        variance = sum((r - mean_ratio) ** 2 for r in ratios) / max(len(ratios), 1) if len(ratios) > 1 else 0
 
-        if success_rate >= 0.8 and avg_gain >= 1:
+        rw_attempts = stats['rw_attempts']
+        # Beta-smoothed success rate: (successes + 1) / (attempts + 2)
+        beta_success = (stats['successes'] + 1) / (rw_attempts + 2) if rw_attempts > 0 else 0.5
+        avg_delta = stats['total_delta'] / max(stats['successes'], 1) if stats['successes'] > 0 else 0
+
+        # Classification with minimum sample sizes
+        if rw_attempts < 5:
+            status = 'insufficient_data'
+            weight = 1.0
+            classification = 'insufficient_data'
+        elif rw_attempts >= 8 and beta_success >= 0.8 and avg_delta >= 5:
+            status = 'proven'
+            weight = 1.05
+            classification = 'proven'
+        elif obs >= 10 and missing_rate >= 0.8:
+            status = 'stale'
+            weight = 0.75
+            classification = 'stale'
+        elif rw_attempts >= 8 and beta_success < 0.2:
+            status = 'stale'
+            weight = 0.75
+            classification = 'stale'
+        elif rw_attempts >= 8 and (variance > 0.08 or 0.4 <= beta_success < 0.8):
+            status = 'fragile'
+            weight = 1.15
+            classification = 'fragile'
+        else:
+            status = 'insufficient_data'
+            weight = 1.0
+            classification = 'insufficient_data'
+
+        evolved_dim_weights[dim] = weight
+
+        # Build rule descriptions
+        if classification == 'proven':
             proven_fixes.append({
                 'dimension': dim,
-                'success_rate': round(success_rate * 100),
-                'avg_gain': round(avg_gain, 1),
-                'attempts': stats['attempts'],
-                'rule': f'{dim}: high-confidence fix — apply automatically. '
-                        f'{stats["successes"]}/{stats["attempts"]} success, +{avg_gain} avg gain.',
+                'beta_success_rate': round(beta_success * 100),
+                'avg_delta': round(avg_delta, 1),
+                'rw_attempts': rw_attempts,
+                'observations': obs,
+                'weight': weight,
+                'rule': (f'{dim}: high-confidence fix — '
+                         f'{stats["successes"]}/{rw_attempts} success (β={beta_success:.0%}), '
+                         f'+{avg_delta:.1f} avg gain. Apply automatically.'),
             })
-        elif success_rate >= 0.4:
+        elif classification == 'fragile':
             fragile_fixes.append({
                 'dimension': dim,
-                'success_rate': round(success_rate * 100),
-                'avg_gain': round(avg_gain, 1),
-                'attempts': stats['attempts'],
-                'rule': f'{dim}: mixed results — review rewrite approach. '
-                        f'{stats["successes"]}/{stats["attempts"]} success.',
+                'beta_success_rate': round(beta_success * 100),
+                'avg_delta': round(avg_delta, 1),
+                'rw_attempts': rw_attempts,
+                'variance': round(variance, 3),
+                'weight': weight,
+                'rule': (f'{dim}: mixed results — '
+                         f'{stats["successes"]}/{rw_attempts} success (β={beta_success:.0%}), '
+                         f'variance={variance:.3f}. Review rewrite approach.'),
             })
-        else:
+        elif classification == 'stale':
             stale_dims.append({
                 'dimension': dim,
-                'success_rate': round(success_rate * 100),
-                'attempts': stats['attempts'],
-                'rule': f'{dim}: rarely improves with rewrite — may be content-intrinsic.',
+                'beta_success_rate': round(beta_success * 100),
+                'observations': obs,
+                'missing_rate': round(missing_rate * 100),
+                'rw_attempts': rw_attempts,
+                'weight': weight,
+                'rule': (f'{dim}: stale — '
+                         f'missing_rate={missing_rate:.0%}, β_success={beta_success:.0%}. '
+                         f'May be content-intrinsic.'),
+            })
+        else:
+            insufficient.append({
+                'dimension': dim,
+                'rw_attempts': rw_attempts,
+                'observations': obs,
+                'weight': weight,
+                'rule': f'{dim}: insufficient data ({rw_attempts} rewrites, {obs} detections).',
             })
 
     # ── Generate evolved config ──
     evolved = {
         '_meta': {
             'evolved_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
-            'based_on': f'{len(rewrites)} rewrites, {len(detections)} detections',
+            'based_on': f'{len(rewrites)} rewrites, {len(detections)} detections (last {recent_window} each)',
             'version': VERSION,
         },
         'evolution_rules': {
             'proven_fixes': proven_fixes,
             'fragile_fixes': fragile_fixes,
             'stale_dimensions': stale_dims,
+            'insufficient_data': insufficient,
         },
-        # Auto-adjust dimension hints: proven fixes get higher priority in rewrite_hints
         'priority_hints': [pf['dimension'] for pf in proven_fixes],
         'skip_hints': [sd['dimension'] for sd in stale_dims],
+        'evolved_dim_weights': evolved_dim_weights,
     }
 
-    # ── Build evolved dimension weights for detection feedback loop ──
-    # stale_dims → weight 0 (skip — never improves, noise only)
-    # proven_fixes → weight 0.5 (Agent has internalized — reduce scrutiny)
-    # fragile → weight 1.0 (keep watching)
-    # unmentioned → weight 1.0 (no data yet)
-    evolved_dim_weights = {}
-    for sd in stale_dims:
-        evolved_dim_weights[sd['dimension']] = 0.0
-    for pf in proven_fixes:
-        evolved_dim_weights[pf['dimension']] = 0.5
-    for ff in fragile_fixes:
-        evolved_dim_weights[ff['dimension']] = 1.0
-    evolved['evolved_dim_weights'] = evolved_dim_weights
-
-    # ── Save snapshot (after weights are built — v0.6.3 fix) ──
+    # ── Save snapshot ──
     os.makedirs(SNAPSHOT_DIR, exist_ok=True)
     snapshot_path = os.path.join(SNAPSHOT_DIR, f'evolved_{time.strftime("%Y%m%d_%H%M%S")}.json')
     try:
@@ -1191,7 +1272,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
     except Exception:
         pass
 
-    # ── Update evolution state (include weights directly — v0.6.3 fix) ──
+    # ── Update evolution state ──
     try:
         os.makedirs(os.path.dirname(EVOLUTION_STATE), exist_ok=True)
         with open(EVOLUTION_STATE, 'w', encoding='utf-8') as f:
@@ -1199,7 +1280,10 @@ def evolve_detector(min_entries: int = 5) -> dict:
                 'last_evolved': time.strftime('%Y-%m-%dT%H:%M:%S'),
                 'total_rewrites': len(rewrites),
                 'total_detections': len(detections),
-                'proven_fixes_count': len(proven_fixes),
+                'proven_count': len(proven_fixes),
+                'fragile_count': len(fragile_fixes),
+                'stale_count': len(stale_dims),
+                'insufficient_count': len(insufficient),
                 'latest_snapshot': snapshot_path,
                 'evolved_dim_weights': evolved_dim_weights,
             }, f, ensure_ascii=False, indent=2)
@@ -1207,6 +1291,7 @@ def evolve_detector(min_entries: int = 5) -> dict:
         pass
 
     return evolved
+
 
 
 def show_evolution_log() -> dict:
@@ -1298,9 +1383,9 @@ def show_evolution_log() -> dict:
                         evolution_history.append({
                             'evolved_at': evolved_at,
                             'based_on': snap_data.get('_meta', {}).get('based_on', ''),
-                            'stale_count': sum(1 for w in active_weights.values() if w == 0),
-                            'proven_count': sum(1 for w in active_weights.values() if w == 0.5),
-                            'fragile_count': sum(1 for w in active_weights.values() if w == 1.0),
+                            'stale_count': sum(1 for w in active_weights.values() if w < 0.9),
+                            'proven_count': sum(1 for w in active_weights.values() if 0.9 <= w <= 1.05),
+                            'fragile_count': sum(1 for w in active_weights.values() if w > 1.05),
                         })
         # Also load all past snapshots for history
         snap_dir = os.path.expanduser('~/.geo-auditor/snapshots')
@@ -1317,9 +1402,9 @@ def show_evolution_log() -> dict:
                                 evolution_history.append({
                                     'evolved_at': evolved_at,
                                     'based_on': hist.get('_meta', {}).get('based_on', ''),
-                                    'stale_count': sum(1 for v in w.values() if v == 0),
-                                    'proven_count': sum(1 for v in w.values() if v == 0.5),
-                                    'fragile_count': sum(1 for v in w.values() if v == 1.0),
+                                    'stale_count': sum(1 for v in w.values() if v < 0.9),
+                                    'proven_count': sum(1 for v in w.values() if 0.9 <= v <= 1.05),
+                                    'fragile_count': sum(1 for v in w.values() if v > 1.05),
                                 })
                     except Exception:
                         pass
@@ -1329,8 +1414,15 @@ def show_evolution_log() -> dict:
     # ── Active weight breakdown ──
     weight_status = {}
     for dim, w in active_weights.items():
-        label = 'stale' if w == 0 else 'proven' if w == 0.5 else 'fragile'
-        weight_status[dim] = {'weight': w, 'status': label}
+        if w < 0.9:
+            label, status = 'stale', '↓'
+        elif w > 1.05:
+            label, status = 'fragile', '⚠'
+        elif w == 1.0:
+            label, status = 'neutral', '→'
+        else:
+            label, status = 'proven', '✅'
+        weight_status[dim] = {'weight': w, 'status': status, 'label': label}
 
     return {
         'summary': {
@@ -1391,11 +1483,14 @@ def format_evolution_log(data: dict) -> str:
         out.append("")
         out.append("  🔄 Active Detector Adaptation:")
         if stale:
-            out.append(f"     💤 Skipped (weight=0): {', '.join(stale.keys())}")
+            vals = ', '.join(f'{d}({w["weight"]:.2f})' for d, w in stale.items())
+            out.append(f"     💤 Stale (low confidence): {vals}")
         if proven:
-            out.append(f"     ✅ Relaxed (weight=0.5): {', '.join(proven.keys())}")
+            vals = ', '.join(f'{d}({w["weight"]:.2f})' for d, w in proven.items())
+            out.append(f"     ✅ Proven (high confidence): {vals}")
         if fragile:
-            out.append(f"     ⚠️ Watching (weight=1.0): {', '.join(fragile.keys())}")
+            vals = ', '.join(f'{d}({w["weight"]:.2f})' for d, w in fragile.items())
+            out.append(f"     ⚠️ Fragile (high scrutiny): {vals}")
     elif data.get('summary', {}).get('total_rewrites', 0) >= 5:
         out.append("")
         out.append("  💡 Tip: run --evolve to activate detector adaptation")
@@ -1445,10 +1540,18 @@ def format_evolve_result(data: dict) -> str:
     if data.get('priority_hints'):
         out.append(f"  🎯 Priority rewrite order: {', '.join(data['priority_hints'][:5])}")
     if data.get('evolved_dim_weights'):
-        stale_count = sum(1 for w in data['evolved_dim_weights'].values() if w == 0)
-        proven_count = sum(1 for w in data['evolved_dim_weights'].values() if w == 0.5)
+        wts = data['evolved_dim_weights']
+        stale_count = sum(1 for w in wts.values() if w < 0.9)
+        proven_count = sum(1 for w in wts.values() if 0.9 <= w <= 1.05 and w != 1.0)
+        fragile_count = sum(1 for w in wts.values() if w > 1.05)
+        neutral_count = sum(1 for w in wts.values() if w == 1.0)
         out.append("")
-        out.append(f"  🔄 Detector adapted: {stale_count} dims skipped, {proven_count} dims relaxed")
+        parts = []
+        if stale_count: parts.append(f'{stale_count} stale (0.75)')
+        if proven_count: parts.append(f'{proven_count} proven (1.05)')
+        if fragile_count: parts.append(f'{fragile_count} fragile (1.15)')
+        if neutral_count: parts.append(f'{neutral_count} neutral (1.0)')
+        out.append(f"  🔄 Detector adapted: {', '.join(parts)}")
         out.append("     Weights auto-loaded on next detection.")
 
     return '\n'.join(out)
