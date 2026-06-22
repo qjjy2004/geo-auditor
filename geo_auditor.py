@@ -501,19 +501,67 @@ def detect(text: str, config: Config = None) -> dict:
     dims.append({'n': 'Semantic Match', 's': sem, 'm': 4, 'd': sem_d, 'icon': '🎯'})
     total += sem
 
-    # 14. Anti-AI Voice 4
+    # 14. Anti-AI Voice 4 (enhanced: position tracking + diversity + openers)
     ai_hits = 0
+    ai_found = []  # list of {word, para, suggestion}
     for pat in ai_forbidden:
-        ai_hits += len(pat.findall(ft))
+        for m in pat.finditer(ft):
+            pos = ft[:m.start()].count('\n')
+            ai_found.append({'word': m.group(), 'para': pos + 1,
+                            'suggestion': 'Break this pattern — use conversational transition'})
+            ai_hits += 1
     for w in ai_waste:
-        ai_hits += count_keyword(ft, w)
-    if ai_hits == 0: deai = 4
-    elif ai_hits <= 2: deai = 3
-    elif ai_hits <= 5: deai = 1
-    else: deai = 0
-    deai_d = ('Zero AI-template words — authentic voice'
-              if ai_hits == 0 else (f'{ai_hits} AI-tells, acceptable'
-              if ai_hits <= 2 else f'{ai_hits} AI-template words — rewrite naturally'))
+        escaped = re.escape(w)
+        for m in re.finditer(escaped, ft, re.IGNORECASE):
+            pos = ft[:m.start()].count('\n')
+            ai_found.append({'word': w, 'para': pos + 1,
+                            'suggestion': f'Avoid template phrase — rephrase in natural voice'})
+            ai_hits += 1
+
+    # Sentence diversity: all "X is Y" pattern → low diversity
+    sents = re.split(r'[.!?。！？\n]', body)
+    sents = [s.strip() for s in sents if len(s.strip()) > 10]
+    simple_decl = sum(1 for s in sents if re.match(r'^.{0,5}(是|is|are|was|were)\b', s))
+    sent_diversity = 1.0
+    if len(sents) >= 4:
+        simple_ratio = simple_decl / len(sents)
+        sent_diversity = max(0.3, 1.0 - simple_ratio)
+
+    # Paragraph opener repetition
+    para_openers = []
+    for p in paras:
+        opener = p.strip()[:15].rstrip('，,.。!！?？\n')
+        if opener:
+            para_openers.append(opener)
+    opener_repeats = 0
+    if len(para_openers) >= 3:
+        oc = Counter(para_openers)
+        opener_repeats = sum(c - 1 for c in oc.values() if c > 1)
+
+    # Score synthesis
+    if ai_hits == 0 and sent_diversity > 0.7 and opener_repeats == 0:
+        deai = 4
+    elif ai_hits <= 2 and sent_diversity > 0.5 and opener_repeats <= 1:
+        deai = 3
+    elif ai_hits <= 5:
+        deai = 1
+    else:
+        deai = 0
+
+    deai_d = ('Zero AI-tells + varied voice — authentic'
+              if deai >= 4 else ('Minor AI traces, acceptable'
+              if deai >= 3 else (f'{ai_hits} AI-tells, low diversity — rewrite naturally'
+              if deai >= 1 else f'{ai_hits} AI-tells — heavy machine voice')))
+
+    voice_details = {
+        'ai_word_count': ai_hits,
+        'ai_words_found': ai_found[:20],  # top 20 with position+replacement
+        'sentence_diversity': round(sent_diversity, 2),
+        'sentence_count': len(sents),
+        'simple_declarative_pct': round(simple_decl / max(len(sents), 1) * 100),
+        'opener_repeats': opener_repeats,
+        'repeated_openers': [o for o, c in Counter(para_openers).items() if c > 1][:5],
+    }
     dims.append({'n': 'Anti-AI Voice', 's': deai, 'm': 4, 'd': deai_d, 'icon': '🤖'})
     total += deai
 
@@ -548,6 +596,7 @@ def detect(text: str, config: Config = None) -> dict:
         'dimensions': dims,
         'suggestions': sugg,
         'rewrite_hints': rewrite_hints,
+        'voice_details': voice_details,
         'stats': {
             'textLength': len(ft),
             'paraCount': len(paras),
@@ -662,9 +711,126 @@ def analyze_history(results: list) -> dict:
             'scores': [r['pct'] for r in results],
         }
     }
+    return analysis
 
 
-def format_output(result: dict) -> str:
+def learn_from_history(results: list) -> dict:
+    """Generate executable writing strategy updates from detection history"""
+    analysis = analyze_history(results)
+    if 'error' in analysis:
+        return analysis
+
+    rules = {
+        'lock_in': [],
+        'fix_first': [],
+        'watch': [],
+        'template_patch': [],
+    }
+
+    for name in analysis['patterns']['always_high']:
+        trend = analysis['dimension_trends'][name]
+        rules['lock_in'].append({
+            'dimension': name,
+            'evidence': f'Scored {trend["last"]}/{trend["max"]} consistently',
+            'action': f'Keep current approach for {name}',
+        })
+
+    gaps = []
+    for name in analysis['patterns']['always_low']:
+        trend = analysis['dimension_trends'][name]
+        avg_score = sum(trend['scores']) / len(trend['scores'])
+        gap = trend['max'] - avg_score
+        gaps.append((name, gap, trend))
+    gaps.sort(key=lambda x: -x[1])
+
+    for name, gap, trend in gaps:
+        hint = generate_rewrite_hint(name, trend['last'], trend['max'], '')
+        rules['fix_first'].append({
+            'dimension': name,
+            'avg_score': round(sum(trend['scores']) / len(trend['scores']), 1),
+            'gap': round(gap, 1),
+            'action': hint['action'],
+            'instruction': hint['instruction'],
+            'target_section': hint['target_section'],
+        })
+        if hint['action'] == 'add_qa_section':
+            rules['template_patch'].append('Add Q&A block to template footer')
+        elif hint['action'] == 'add_cta':
+            rules['template_patch'].append('Add CTA line to template footer')
+        elif hint['action'] == 'add_numbers':
+            rules['template_patch'].append('Add [data + source] placeholder to template body')
+        elif hint['action'] == 'add_context':
+            rules['template_patch'].append('Add [Location, Org, Year] line to template intro')
+
+    for name in analysis['patterns']['improving']:
+        if name not in analysis['patterns']['always_high']:
+            trend = analysis['dimension_trends'][name]
+            if trend['delta'] <= 2:
+                rules['watch'].append({
+                    'dimension': name,
+                    'trend': f'{trend["first"]}→{trend["last"]}',
+                    'note': 'Improving but fragile',
+                })
+
+    for name in analysis['patterns']['worsening']:
+        trend = analysis['dimension_trends'][name]
+        rules['watch'].append({
+            'dimension': name,
+            'trend': f'{trend["first"]}→{trend["last"]}',
+            'note': 'Declining — recent changes may have hurt this',
+        })
+
+    return {
+        'summary': {
+            'checks_analyzed': analysis['results_count'],
+            'score_progress': f'{analysis["score_trend"]["first"]}% → {analysis["score_trend"]["last"]}%',
+            'lock_in_count': len(rules['lock_in']),
+            'fix_first_count': len(rules['fix_first']),
+            'template_patches': len(rules['template_patch']),
+        },
+        'writing_rules': rules,
+        'trends': analysis['dimension_trends'],
+    }
+
+
+def format_learn(learn: dict) -> str:
+    """Human-readable learning output"""
+    out = []
+    out.append("╔══════════════════════════════════╗")
+    out.append("║  GEO Auditor — Writing Strategy  ║")
+    out.append("╠══════════════════════════════════╣")
+    s = learn['summary']
+    out.append(f"║  {s['score_progress']} over {s['checks_analyzed']} checks          ║")
+    out.append("╚══════════════════════════════════╝")
+    out.append("")
+
+    r = learn['writing_rules']
+
+    if r['lock_in']:
+        out.append("  ✅ LOCK IN — Keep doing these:")
+        for item in r['lock_in']:
+            out.append(f"     {item['dimension']}: {item['evidence']}")
+        out.append("")
+
+    if r['fix_first']:
+        out.append("  🔧 FIX FIRST — Before next writing session:")
+        for item in r['fix_first']:
+            out.append(f"     {item['dimension']}: {item['action']}")
+            out.append(f"     → {item['instruction'][:100]}")
+        out.append("")
+
+    if r['template_patch']:
+        out.append("  📝 TEMPLATE UPDATES — Apply to writing template:")
+        for patch in r['template_patch']:
+            out.append(f"     • {patch}")
+        out.append("")
+
+    if r['watch']:
+        out.append("  👀 WATCH — Monitor these:")
+        for item in r['watch']:
+            out.append(f"     {item['dimension']} {item['trend']}: {item['note']}")
+
+    return '\n'.join(out)
     """Human-readable output"""
     r = result
     grade_emoji = {'S': '🏆 Excellent', 'A': '✅ Good', 'B': '⚠️ Needs Work', 'C': '❌ Rewrite'}
@@ -801,11 +967,13 @@ Config file format (geo_auditor.json):
                         help='Compare two files: --compare old.md new.md')
     parser.add_argument('--history', action='store_true',
                         help='Read JSONL results from stdin, analyze improvement patterns')
+    parser.add_argument('--learn', action='store_true',
+                        help='Like --history but generates executable writing strategy rules')
     parser.add_argument('--version', '-v', action='version', version=f'GEO Auditor v{VERSION}')
     args = parser.parse_args()
 
     # ── History / Agent Learning mode ──
-    if args.history:
+    if args.history or args.learn:
         results = []
         for line in sys.stdin:
             line = line.strip()
@@ -818,11 +986,18 @@ Config file format (geo_auditor.json):
             print("Error: need at least 2 JSON results for pattern analysis (via stdin)",
                   file=sys.stderr)
             sys.exit(1)
-        analysis = analyze_history(results)
-        if args.json:
-            print(json.dumps(analysis, ensure_ascii=False, indent=2))
+        if args.learn:
+            analysis = learn_from_history(results)
+            if args.json:
+                print(json.dumps(analysis, ensure_ascii=False, indent=2))
+            else:
+                print(format_learn(analysis))
         else:
-            print(format_history(analysis))
+            analysis = analyze_history(results)
+            if args.json:
+                print(json.dumps(analysis, ensure_ascii=False, indent=2))
+            else:
+                print(format_history(analysis))
         return
 
     # ── Compare mode ──
