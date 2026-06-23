@@ -6,8 +6,18 @@
 <title>GEO Auditor · Headlights, Not Rearview Mirror</title>
 <style>
 :root {
+  --bg: #ffffff; --card: #f8f9fa; --bd: #e2e4e7; --tx: #1a1a2e;
+  --mu: #6b7280; --ac: #2563eb; --dn: #dc2626; --gn: #059669; --or: #d97706;
+  --dim-bar-bg: #e5e7eb; --hover-bg: rgba(0,0,0,.03); --badge-bg: rgba(37,99,235,.08);
+  --badge-bd: rgba(37,99,235,.18); --survey-bg: rgba(37,99,235,.04);
+  --survey-bd: rgba(37,99,235,.12);
+}
+[data-theme="dark"] {
   --bg: #161e2b; --card: #1e2d3d; --bd: #2d3f54; --tx: #d4dee8;
   --mu: #7a8fa0; --ac: #5b8def; --dn: #f87171; --gn: #34d399; --or: #fbbf24;
+  --dim-bar-bg: rgba(255,255,255,.08); --hover-bg: rgba(255,255,255,.03);
+  --badge-bg: rgba(88,166,255,.1); --badge-bd: rgba(88,166,255,.2);
+  --survey-bg: rgba(88,166,255,.05); --survey-bd: rgba(88,166,255,.15);
 }
 * { margin:0;padding:0;box-sizing:border-box }
 body {
@@ -20,12 +30,12 @@ header {
   text-align: center; padding: 30px 0 20px;
   border-bottom: 1px solid var(--bd); margin-bottom: 24px;
 }
-header h1 { font-size: 1.6em; color: #fff; }
+header h1 { font-size: 1.6em; color: var(--tx); }
 header p { font-size: .85em; color: var(--mu); margin-top: 6px; }
-.badges { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.badges { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; align-items: center; }
 .badge {
   font-size: 11px; padding: 3px 10px; border-radius: 12px;
-  background: rgba(88,166,255,.1); color: var(--ac); border: 1px solid rgba(88,166,255,.2);
+  background: var(--badge-bg); color: var(--ac); border: 1px solid var(--badge-bd);
 }
 textarea {
   width: 100%; height: 260px; background: var(--card); border: 1px solid var(--bd);
@@ -43,7 +53,7 @@ textarea:focus { outline: none; border-color: var(--ac); }
 .btn-out {
   background: transparent; border: 1px solid var(--bd); color: var(--tx);
 }
-.btn-out:hover { background: rgba(255,255,255,.05); }
+.btn-out:hover { background: var(--hover-bg); }
 .btn-sm { padding: 5px 12px; font-size: 12px; }
 .result { display: none; margin-top: 20px; }
 .score-circle {
@@ -66,13 +76,13 @@ textarea:focus { outline: none; border-color: var(--ac); }
 .dim-section { margin-bottom: 16px; }
 .dim-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 0;
-  border-bottom: 1px solid rgba(48,54,61,.4); font-size: 13px;
+  border-bottom: 1px solid var(--bd); font-size: 13px;
 }
 .dim-item:last-child { border: none; }
 .dim-icon { font-size: 1em; width: 24px; text-align: center; flex-shrink: 0; }
 .dim-name { width: 135px; font-weight: 500; flex-shrink: 0; }
 .dim-score { width: 44px; text-align: right; font-weight: 600; flex-shrink: 0; }
-.dim-bar { flex: 1; height: 5px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+.dim-bar { flex: 1; height: 5px; background: var(--dim-bar-bg); border-radius: 3px; overflow: hidden; }
 .dim-fill { height: 100%; border-radius: 3px; transition: width .5s; }
 .dim-desc { font-size: 12px; color: var(--mu); padding: 2px 0 8px 34px; }
 .sug { font-size: 12px; padding: 6px 10px; margin: 4px 0; border-radius: 4px; }
@@ -88,10 +98,10 @@ textarea:focus { outline: none; border-color: var(--ac); }
 .hist-list { max-height: 400px; overflow-y: auto; }
 .hist-row {
   display: flex; align-items: center; gap: 10px; padding: 10px;
-  border-bottom: 1px solid rgba(48,54,61,.3); cursor: pointer; font-size: 13px;
+  border-bottom: 1px solid var(--bd); cursor: pointer; font-size: 13px;
   transition: background .15s;
 }
-.hist-row:hover { background: rgba(255,255,255,.03); }
+.hist-row:hover { background: var(--hover-bg); }
 .hist-score { width: 50px; text-align: center; font-weight: 700; font-size: 1.1em; }
 .hist-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hist-date { color: var(--mu); font-size: 11px; white-space: nowrap; }
@@ -104,12 +114,12 @@ textarea:focus { outline: none; border-color: var(--ac); }
 /* ── Mini survey ── */
 .survey-card {
   margin-top: 16px; padding: 14px 18px; border-radius: 8px;
-  background: rgba(88,166,255,.05); border: 1px solid rgba(88,166,255,.15);
+  background: var(--survey-bg); border: 1px solid var(--survey-bd);
   font-size: 13px; display: none;
 }
-.survey-card h4 { font-size: 13px; color: #fff; margin: 0 0 10px 0; }
+.survey-card h4 { font-size: 13px; color: var(--tx); margin: 0 0 10px 0; }
 .survey-card label { display: block; margin: 6px 0; cursor: pointer; color: var(--tx); }
-.survey-card label:hover { color: #fff; }
+.survey-card label:hover { color: var(--ac); }
 .survey-card input[type=radio] { margin-right: 8px; }
 .survey-card .survey-btn {
   margin-top: 10px; padding: 6px 14px; border-radius: 4px; font-size: 12px;
@@ -121,6 +131,13 @@ footer {
   border-top: 1px solid var(--bd); margin-top: 40px;
 }
 footer a { color: var(--ac); text-decoration: none; }
+/* theme toggle */
+.theme-toggle {
+  background: var(--card); border: 1px solid var(--bd); border-radius: 20px;
+  cursor: pointer; font-size: 16px; padding: 4px 8px; line-height: 1;
+  transition: .2s; vertical-align: middle;
+}
+.theme-toggle:hover { background: var(--hover-bg); }
 </style>
 </head>
 <body>
@@ -133,6 +150,7 @@ footer a { color: var(--ac); text-decoration: none; }
       <span class="badge">Agent API</span>
       <span class="badge">Zero Config</span>
       <span class="badge">Local Only</span>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light">🌙</button>
     </div>
   </header>
 
@@ -196,6 +214,18 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
 <div class="toast" id="toast"></div>
 
 <script>
+// ═══ Theme toggle ═══
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const saved = localStorage.getItem('geo-theme');
+const theme = saved || (prefersDark ? 'dark' : 'light');
+document.documentElement.setAttribute('data-theme', theme);
+function toggleTheme() {
+  const el = document.documentElement;
+  const cur = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  el.setAttribute('data-theme', cur);
+  localStorage.setItem('geo-theme', cur);
+}
+
 // ══════════════════════════════════════════
 // GEO Auditor v0.6.6 — 14-dimension engine
 // Language-agnostic, zero-config
