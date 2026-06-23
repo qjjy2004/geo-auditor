@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-GEO Auditor — AI Search Content Quality Detector
-14-dimension check + anti-AI-voice + Agent-driven self-evolution
+GEO Auditor — Headlights, Not Rearview Mirror
+Competitors monitor AI mentions after you publish.
+GEO Auditor checks whether your content is citable — before you publish.
+14-dimension + anti-AI-voice + self-evolution.
 
 Usage:
   python3 geo_auditor.py "your content text"

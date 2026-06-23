@@ -1,4 +1,4 @@
-# GEO Auditor · The Agent's Evolving Writing Brain
+# GEO Auditor · Headlights, Not Rearview Mirror
 
 [![Version](https://img.shields.io/badge/version-v0.6.6-blue)](https://github.com/qjjy2004/geo-auditor/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -8,23 +8,42 @@
 
 ![demo](demo.gif)
 
-**Not just a detector. A self-evolving system that trains your AI Agent to write better.**
+**Every GEO tool tells you what already happened. GEO Auditor tells you what will happen — before you hit publish.**
+
+---
+
+## The Difference: Rearview Mirror vs Headlights
+
+All GEO tools work the same way:
+
+```
+Define prompts → Run AI search engines → Record: "Was your brand mentioned?"
+```
+
+They answer one question: **"Did AI mention my brand?"** — after the fact. They're rearview mirrors. They don't need to evolve; they just record.
+
+**GEO Auditor answers a different question: "Will AI cite my content?"** — before you publish. This is a headlight. It has to evolve, because detection accuracy compounds with every rewrite.
+
+| | Monitoring Tools (competitors) | GEO Auditor |
+|---|---|---|
+| **When** | After publishing | Before publishing |
+| **What it checks** | "Was my brand in the AI answer?" | "Can AI extract and cite this content?" |
+| **Analogy** | Rearview mirror | Headlight |
+| **Evolution** | None needed (just records) | **Core feature** (gets smarter every rewrite) |
+
+**This is why self-evolution and AI rewrite suggestions are core features — not nice-to-haves.** A monitoring tool doesn't need to learn. A detection tool must.
 
 ---
 
 ## Why GEO Auditor
 
-Most GEO tools are static checkers: paste → score → done. The score doesn't change the Agent's behavior.
-
-GEO Auditor closes the loop:
-
 ```
-Agent writes → Detector scores → Agent rewrites → Compare → 
-Accumulate experience → Evolve → Generate Agent prompt → 
+Agent writes → Detector scores → Agent rewrites → Compare →
+Accumulate experience → Evolve → Generate Agent prompt →
 Agent now writes at higher baseline
 ```
 
-**The detector itself gets smarter with every rewrite. Your Agent inherits that intelligence.**
+The detector itself gets smarter with every rewrite. Your Agent inherits that intelligence.
 
 ---
 
@@ -41,7 +60,7 @@ python3 geo_auditor.py --rewrite-prompt               # LLM rewrite suggestions
 
 14 dimensions, 6-signal Anti-AI Voice, bilingual (EN+CN). Zero dependencies.
 
-**CLI + Web — two interfaces, one detector.** The web version (`geo-auditor.html`) runs the full detection engine in-browser with the same 14-dimension + 6-signal Anti-AI Voice model. The CLI (`geo_auditor.py`) adds evolution tracking, Agent training, and config injection features that require filesystem access.
+**CLI + Web — two interfaces, one detector.** The web version (`geo-auditor.html`) runs the full detection engine in-browser. The CLI (`geo_auditor.py`) adds evolution tracking, Agent training, and config injection.
 
 ### 2. As an Agent Trainer (Evolution System)
 
@@ -107,7 +126,7 @@ STALE (don't waste time):
 | Semantic Match | 4 | | |
 | Anti-AI Voice | 4 | | |
 
-**GEO structures (comparisons, FAQ, numbered lists) are boosted — not penalized as AI voice. Design boundary documented in code.**
+**GEO structures (comparisons, FAQ, numbered lists) are boosted — not penalized as AI voice.** Design boundary documented in code.
 
 ---
 
@@ -153,6 +172,8 @@ python3 geo_auditor.py --agent-prompt
 **Is my content sent anywhere?** No. Zero network calls. Everything runs locally.
 
 **What's different from GPTZero / Originality.ai?** They detect AI-generated text. GEO Auditor measures **AI search citation quality** — content that scores well is optimized for being cited by AI search engines (Perplexity, ChatGPT Search, Google AI Overviews, Claude).
+
+**How is this different from Semrush GEO / Otterly / KIME?** They monitor whether your brand appears in AI answers **after** you publish. GEO Auditor checks whether your content is citable **before** you publish. Rearview mirror vs headlight.
 
 **Why zero dependencies?** You should be able to run it anywhere without `pip install`. Python 3.7+ stdlib only.
 
