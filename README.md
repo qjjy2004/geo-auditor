@@ -6,6 +6,8 @@
 [![Test](https://github.com/qjjy2004/geo-auditor/actions/workflows/test.yml/badge.svg)](https://github.com/qjjy2004/geo-auditor/actions/workflows/test.yml)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://github.com/qjjy2004/geo-auditor)
 
+![demo](demo.gif)
+
 **Not just a detector. A self-evolving system that trains your AI Agent to write better.**
 
 ---
