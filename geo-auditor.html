@@ -143,10 +143,11 @@ footer a { color: var(--ac); text-decoration: none; }
 <body>
 <div class="container">
   <header>
-    <h1>GEO Auditor</h1>
-    <p>Check before you publish. Competitors show what happened — we show what will happen.</p>
+    <h1>GEO Auditor <span style="font-size:.5em;color:var(--mu);font-weight:400">v0.7.0 · Self-Evolving</span></h1>
+    <p>Detect → Rewrite → Compare → Evolve. A self-improving content engine that learns from every rewrite.</p>
     <div class="badges">
-      <span class="badge">Anti-AI Voice</span>
+      <span class="badge">AI Rewrite</span>
+      <span class="badge">Self-Evolving</span>
       <span class="badge">Agent API</span>
       <span class="badge">Zero Config</span>
       <span class="badge">Local Only</span>
@@ -157,6 +158,7 @@ footer a { color: var(--ac); text-decoration: none; }
   <div class="tabs">
     <button class="tab active" onclick="showTab('check', event)">Check</button>
     <button class="tab" onclick="showTab('history', event)">History</button>
+    <button class="tab" onclick="showTab('compare', event)">Compare</button>
   </div>
 
   <div id="checkPanel">
@@ -167,9 +169,22 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
     <div class="btn-row">
       <button class="btn btn-ac" onclick="runCheck()">Run Check</button>
       <button class="btn btn-out btn-sm" onclick="loadDimsSample()">📖 14维示例</button>
+      <button class="btn btn-ac btn-sm" id="rewriteBtn" onclick="aiRewrite()" style="display:none;background:var(--or)">🤖 AI Rewrite</button>
+      <button class="btn btn-out btn-sm" onclick="toggleApiSettings()" style="font-size:11px">⚙️ API</button>
       <button class="btn btn-out btn-sm" onclick="clearInput()">Clear</button>
       <button class="btn btn-out btn-sm" id="copyBtn" onclick="copyResult()" style="display:none">Copy Result</button>
     </div>
+    <div style="margin-top:8px;color:var(--mu);font-size:11px;line-height:1.5">💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from.</div>
+    <div id="apiSettings" style="display:none;margin-top:12px;padding:12px;background:var(--card);border:1px solid var(--bd);border-radius:6px;font-size:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label style="color:var(--tx)">Endpoint <input id="apiUrl" placeholder="https://api.deepseek.com/v1/chat/completions" style="width:260px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
+        <label style="color:var(--tx)">Key <input id="apiKey" type="password" placeholder="sk-..." style="width:180px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
+        <label style="color:var(--tx)">Model <input id="apiModel" placeholder="deepseek-chat" style="width:130px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
+        <button class="btn btn-ac btn-sm" onclick="saveApiSettings()">Save</button>
+      </div>
+      <div style="margin-top:6px;color:var(--mu);font-size:11px">Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked.</div>
+    </div>
+    <div id="rewritePanel" style="display:none;margin-top:16px"></div>
     <div class="result" id="resultPanel">
       <div id="resultContent"></div>
     </div>
@@ -201,6 +216,28 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
     <div class="btn-row" style="margin-top:10px">
       <button class="btn btn-out btn-sm" onclick="clearHistory()">Clear History</button>
     </div>
+    <div id="evoDataPanel" style="margin-top:10px;padding:10px;background:var(--card);border:1px solid var(--bd);border-radius:6px;font-size:12px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong style="color:var(--tx)">🧬 演化数据</strong>
+        <span style="color:var(--or);font-size:11px">⚠️ 清除浏览器缓存会丢失所有演化数据</span>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-out btn-sm" onclick="exportEvoData()">📥 导出</button>
+        <button class="btn btn-out btn-sm" onclick="document.getElementById('importEvoFile').click()">📤 导入</button>
+        <input type="file" id="importEvoFile" accept=".json" style="display:none" onchange="importEvoData(this)">
+        <span style="color:var(--mu);font-size:11px" id="evoStats"></span>
+      </div>
+    </div>
+  <div id="comparePanel" style="display:none;">
+    <p style="font-size:13px;color:var(--mu);margin-bottom:16px">Select old (A) and new (B) from history, then click Compare to see per-dimension changes.</p>
+    <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
+      <button class="btn btn-out btn-sm" id="cmpA" onclick="navigator.clipboard?null:null" style="min-width:120px">Slot A (old)</button>
+      <span style="color:var(--mu)">vs</span>
+      <button class="btn btn-out btn-sm" id="cmpB" style="min-width:120px">Slot B (new)</button>
+      <button class="btn btn-ac btn-sm" onclick="runCompare()">⚖️ Compare</button>
+      <button class="btn btn-out btn-sm" onclick="_cmpA=null;_cmpB=null;document.getElementById('cmpA').textContent='Slot A (old)';document.getElementById('cmpB').textContent='Slot B (new)';document.getElementById('compareResult').innerHTML=''">Clear</button>
+    </div>
+    <div id="compareResult"></div>
   </div>
 </div>
 
@@ -333,7 +370,9 @@ function escRegex(s) {
 }
 
 // ── Core Detection Engine ──
-function detect(text) {
+function detect(text, evoWeights) {
+  evoWeights = evoWeights || {};
+
   const cleanText = text.replace(/[^\w\s\u4e00-\u9fff]/g, ' ');
   const cnChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length;
   const totalChars = Math.max(cleanText.replace(/\s/g, '').length, 1);
@@ -548,14 +587,27 @@ function detect(text) {
   dims.push({n:L('Anti-AI Voice','去AI腔'), s:deai, m:4, d:deaiD, icon:'🤖'});
   total += deai;
 
-  let pct = Math.round(total / maxTotal * 100);
+  let rawPct = Math.round(total / maxTotal * 100);
+  let adaptiveTotal = total;
+  let adaptivePct = rawPct;
+  if (Object.keys(evoWeights).length > 0) {
+    adaptiveTotal = 0;
+    dims.forEach(d => {
+      const w = evoWeights[d.n] || 1.0;
+      adaptiveTotal += d.s * w;
+    });
+    adaptivePct = Math.max(0, Math.min(100, Math.round(adaptiveTotal / maxTotal * 100)));
+  }
+  let pct = adaptivePct;
+  
   let grade = pct >= 85 ? 'S' : pct >= 70 ? 'A' : pct >= 50 ? 'B' : 'C';
   let circleCls = grade === 'S' ? 's-great' : grade === 'A' ? 's-good' : grade === 'B' ? 's-ok' : 's-poor';
   let sugg = [];
   dims.forEach(d => { if (d.s / d.m < 0.5) sugg.push({t:'fix', m:`${d.n} low: ${d.d}`}); });
   if (sugg.length < 2) sugg.push({t:'good', m:L('Overall GEO-friendly. Keep publishing.','整体GEO友好度良好。')});
 
-  return { title, total, maxTotal, pct, grade, circleCls, dims, sugg, 
+  let rawDims = dims.map(d => ({ n: d.n, s: d.s, m: d.m }));
+  return { title, total, maxTotal, pct, rawPct, adaptivePct, grade, circleCls, dims, rawDims, sugg, _isCN: isCN,
            textLength: ft.length, paraCount: paras.length, avgParaLen: Math.round(avg), dataCount: nm,
            voice_details: { ai_word_count: aiHits, rlhf_signals: rlhfHits, burstiness, 
                             sentence_diversity: Math.round(sentDiversity * 100) / 100,
@@ -570,10 +622,12 @@ function detect(text) {
 function runCheck() { document.getElementById("resultContent").innerHTML="<p style='text-align:center;padding:20px;color:var(--mu)'>检测中...</p>";document.getElementById("resultPanel").style.display="block";
   const text = document.getElementById('contentInput').value.trim();
   if (!text) { toast('Please paste content first'); return; }
-  const r = detect(text);
+  const evoWeights = loadLocalEvolutionWeights();
+  const r = detect(text, evoWeights);
   renderResult(r);
   saveToHistory(r);
   document.getElementById('copyBtn').style.display = 'inline-flex';
+  document.getElementById('rewriteBtn').style.display = 'inline-flex';
   window._lastResult = r;
   maybeShowSurvey();
 }
@@ -612,9 +666,14 @@ function dismissSurvey() {
 
 function renderResult(r) {
   const gradeLabels={'S':L('🏆 Excellent','🏆 优秀'),'A':L('✅ Good','✅ 良好'),'B':L('⚠️ Needs Work','⚠️ 需改进'),'C':L('❌ Rewrite','❌ 重写')};
+  let evoBadge = '';
+  if (r.rawPct !== r.adaptivePct) {
+    const diff = r.adaptivePct - r.rawPct;
+    evoBadge = ` <span style="font-size:11px;background:rgba(88,166,255,.15);color:#58a6ff;padding:1px 6px;border-radius:3px">evolved ${diff>0?'+':''}${diff}</span>`;
+  }
   let html = `
     <div class="${r.circleCls} score-circle">${r.pct}%</div>
-    <div class="grade">${gradeLabels[r.grade]} · ${r.total}/${r.maxTotal} pts</div>
+    <div class="grade">${gradeLabels[r.grade]} · raw ${r.rawPct} → weighted ${r.adaptivePct}${evoBadge}</div>
     <div class="stats">
       <div class="stat"><div class="stat-num">${r.textLength}</div><div class="stat-label">Chars</div></div>
       <div class="stat"><div class="stat-num">${r.paraCount}</div><div class="stat-label">Paras</div></div>
@@ -824,7 +883,8 @@ function showTab(t, evt) {
   if (evt) evt.target.classList.add('active');
   document.getElementById('checkPanel').style.display = t === 'check' ? 'block' : 'none';
   document.getElementById('historyPanel').style.display = t === 'history' ? 'block' : 'none';
-  if (t === 'history') loadHistory();
+  document.getElementById('comparePanel').style.display = t === 'compare' ? 'block' : 'none';
+  if (t === 'history') { loadHistory(); updateEvoStats(); }
 }
 
 // ── History (localStorage) ──
@@ -842,7 +902,8 @@ function saveToHistory(r) {
     grade: r.grade,
     time: new Date().toLocaleString(),
     text: text.substring(0, 5000),
-    dims: r.dims.map(d => ({n: d.n, s: d.s, m: d.m, icon: d.icon}))
+    dims: r.dims.map(d => ({n: d.n, s: d.s, m: d.m, icon: d.icon})),
+    rawDims: r.rawDims || r.dims.map(d => ({n: d.n, s: d.s, m: d.m}))
   });
   if (hist.length > MAX_HIST) hist = hist.slice(0, MAX_HIST);
   try {
@@ -860,10 +921,15 @@ function loadHistory() {
   if (!hist.length) { el.innerHTML = '<p style="color:var(--mu);text-align:center;padding:30px">No history yet</p>'; return; }
   el.innerHTML = hist.map(r => {
     let clr = r.score >= 85 ? '#3fb950' : r.score >= 70 ? '#58a6ff' : r.score >= 50 ? '#d2991d' : '#f85149';
-    return `<div class="hist-row" onclick="viewHistory(${r.id})">
-      <span class="hist-score" style="color:${clr}">${r.score}%</span>
-      <span class="hist-title">${esc(r.title)}</span>
-      <span class="hist-date">${r.time}</span>
+    return `<div class="hist-row">
+      <span class="hist-score" style="color:${clr}" onclick="viewHistory(${r.id})">${r.score}%</span>
+      <span class="hist-title" onclick="viewHistory(${r.id})">${esc(r.title)}</span>
+      <span class="hist-date" onclick="viewHistory(${r.id})">${r.time}</span>
+      <span style="flex-shrink:0;display:flex;gap:4px">
+        <button class="btn btn-out btn-sm" onclick="event.stopPropagation();selectForCompare(${r.id},'A')" style="font-size:11px;padding:2px 6px">A</button>
+        <button class="btn btn-out btn-sm" onclick="event.stopPropagation();selectForCompare(${r.id},'B')" style="font-size:11px;padding:2px 6px">B</button>
+        <button class="btn btn-out btn-sm" onclick="event.stopPropagation();viewHistory(${r.id})" style="font-size:11px;padding:2px 6px">View</button>
+      </span>
     </div>`;
   }).join('');
 }
@@ -886,10 +952,76 @@ function viewHistory(id) {
 }
 
 function clearHistory() {
-  if (confirm('Clear all detection history?')) {
+  if (confirm('Clear all detection history? Comparison data for evolution will be lost.')) {
     localStorage.removeItem(HIST_KEY);
     loadHistory();
+    updateEvoStats();
     toast('History cleared');
+  }
+}
+
+// ═══ Import/Export Evolution Data ═══
+function exportEvoData() {
+  const data = {
+    exported_at: new Date().toISOString(),
+    version: '0.7.0',
+    evolution_log: JSON.parse(localStorage.getItem('geo_evolution_log') || '[]'),
+    evolution_state: JSON.parse(localStorage.getItem('geo_evolution_state') || '{}'),
+    history: JSON.parse(localStorage.getItem(HIST_KEY) || '[]')
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'geo-auditor-evolution-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✓ Evolution data exported');
+}
+
+function importEvoData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.evolution_log && !data.evolution_state) {
+        toast('Invalid file: no evolution data found');
+        return;
+      }
+      if (data.evolution_log) {
+        const existing = JSON.parse(localStorage.getItem('geo_evolution_log') || '[]');
+        const merged = [...existing, ...data.evolution_log].slice(-200);
+        localStorage.setItem('geo_evolution_log', JSON.stringify(merged));
+      }
+      if (data.evolution_state) {
+        localStorage.setItem('geo_evolution_state', JSON.stringify(data.evolution_state));
+      }
+      updateEvoStats();
+      // Re-run evolution with merged data
+      const evo = evolveEngine(false);
+      if (evo.state === 'evolved') {
+        toast('🧬 Imported + evolution re-calculated (' + evo.totalComparisons + ' comparisons)');
+      } else {
+        toast('✓ Data imported (' + (data.evolution_log||[]).length + ' entries)');
+      }
+    } catch(err) {
+      toast('Import failed: invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function updateEvoStats() {
+  const elog = JSON.parse(localStorage.getItem('geo_evolution_log') || '[]');
+  const state = JSON.parse(localStorage.getItem('geo_evolution_state') || '{}');
+  const comps = elog.filter(e => e.accepted !== false).length;
+  const hasWeights = Object.keys(state.weights || {}).length > 0;
+  const el = document.getElementById('evoStats');
+  if (el) {
+    el.textContent = comps + ' comparisons' + (hasWeights ? ' · weights active' : ' · cold start (' + comps + '/5)');
   }
 }
 
@@ -907,6 +1039,198 @@ function toast(msg) {
   t._tid = setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+// ═══ API Settings (localStorage) ═══
+function loadApiSettings() {
+  const s = JSON.parse(localStorage.getItem('geo_api_settings')||'{}');
+  document.getElementById('apiUrl').value = s.url||'';
+  document.getElementById('apiKey').value = s.key||'';
+  document.getElementById('apiModel').value = s.model||'deepseek-chat';
+}
+function saveApiSettings() {
+  localStorage.setItem('geo_api_settings', JSON.stringify({
+    url: document.getElementById('apiUrl').value.trim(),
+    key: document.getElementById('apiKey').value.trim(),
+    model: document.getElementById('apiModel').value.trim()||'deepseek-chat'
+  }));
+  toast('✓ API saved');
+}
+function toggleApiSettings() {
+  const p = document.getElementById('apiSettings');
+  if (p.style.display==='none') { loadApiSettings(); p.style.display='block'; }
+  else p.style.display='none';
+}
+
+// ═══ Rewrite source tracking ═══
+function tagRewriteSource(text, src, mdl) {
+  const h = simpleHash(text);
+  try {
+    const m = JSON.parse(localStorage.getItem('geo_rewrite_sources')||'{}');
+    m[h] = { source:src, model:mdl, ts:Date.now() };
+    const cutoff = Date.now()-7*86400000;
+    for (let k of Object.keys(m)) { if (m[k].ts < cutoff) delete m[k]; }
+    localStorage.setItem('geo_rewrite_sources', JSON.stringify(m));
+  } catch(e) {}
+}
+function getRewriteSource(text) {
+  const h = simpleHash(text);
+  try {
+    const m = JSON.parse(localStorage.getItem('geo_rewrite_sources')||'{}');
+    return m[h]||null;
+  } catch(e) { return null; }
+}
+function simpleHash(s) {
+  let h=0;
+  for (let i=0; i<Math.min(s.length,2000); i++) { h=((h<<5)-h)+s.charCodeAt(i); h|=0; }
+  return h.toString(36);
+}
+
+// ═══ JS Evolution Engine ═══
+const EVOLVE_CONFIG = {
+  minComparisons:5, minDimensionSamples:8, saturateThreshold:85,
+  maxChangePerEvolve:0.05, weightFloor:0.85, weightCeil:1.25,
+  provenRate:0.80, provenDelta:5, staleRate:0.30,
+  fragileRateLow:0.50, fragileRateHigh:0.80, resetAfterStaleRounds:3
+};
+function evolveEngine(includeManual) {
+  let elog;
+  try { elog = JSON.parse(localStorage.getItem('geo_evolution_log')||'[]'); }
+  catch(e) { elog=[]; }
+  const entries = elog.filter(e => e.accepted!==false && (e.source==='ai_rewrite'||(includeManual&&e.source==='manual_edit')));
+  if (entries.length < EVOLVE_CONFIG.minComparisons) {
+    return { weights:{}, state:'cold_start', reason:'Need ≥'+EVOLVE_CONFIG.minComparisons+' comparisons (have '+entries.length+')' };
+  }
+  const allDims = new Set();
+  entries.forEach(e => {
+    Object.keys(e.before_raw||{}).forEach(d => allDims.add(d));
+    Object.keys(e.after_raw||{}).forEach(d => allDims.add(d));
+  });
+  const ds = {};
+  allDims.forEach(dim => {
+    const de = entries.filter(e => { const b=(e.before_raw||{})[dim], a=(e.after_raw||{})[dim]; return b!==undefined && a!==undefined; });
+    const n = de.length;
+    if (n===0) { ds[dim]={n:0,weight:1.0,classification:'insufficient_data'}; return; }
+    const deltas = de.map(e => ((e.after_raw||{})[dim]||0)-((e.before_raw||{})[dim]||0));
+    const imp = deltas.filter(d=>d>0).length, betaRate=(imp+1)/(n+2);
+    const avgDelta = deltas.reduce((s,d)=>s+d,0)/n;
+    const variance = deltas.reduce((s,d)=>s+(d-avgDelta)**2,0)/n;
+    const stdDev = Math.sqrt(variance);
+    const avgBase = de.reduce((s,e)=>s+((e.before_raw||{})[dim]||0),0)/n;
+    let pw=1.0, sr=0;
+    try { const ps=JSON.parse(localStorage.getItem('geo_evolution_state')||'{}'); pw=(ps.weights||{})[dim]||1.0; sr=(ps.staleRounds||{})[dim]||0; } catch(e) {}
+    let cls='insufficient_data', w=1.0;
+    if (avgBase >= EVOLVE_CONFIG.saturateThreshold) { cls='saturated'; w=1.0; }
+    else if (n >= EVOLVE_CONFIG.minDimensionSamples) {
+      if (betaRate>=EVOLVE_CONFIG.provenRate && avgDelta>=EVOLVE_CONFIG.provenDelta && stdDev<6) {
+        cls='proven'; w=1.15+Math.min(0.10,(betaRate-0.80)*0.5+(avgDelta-5)*0.01); w=Math.min(EVOLVE_CONFIG.weightCeil,w);
+      } else if (betaRate>=EVOLVE_CONFIG.fragileRateLow && betaRate<EVOLVE_CONFIG.fragileRateHigh) {
+        cls='fragile'; w=0.90+(betaRate-0.50)*0.67; w=Math.min(1.10,Math.max(0.90,w));
+      } else if (stdDev>6 && betaRate>=0.40) { cls='fragile'; w=0.90; }
+      else if (betaRate<EVOLVE_CONFIG.staleRate) {
+        cls='hard_to_improve'; w=EVOLVE_CONFIG.weightFloor; sr++;
+        if (sr>=EVOLVE_CONFIG.resetAfterStaleRounds) { w=0.95; sr=0; cls='hard_to_improve_reset'; }
+      } else { cls='fragile'; w=1.0; }
+      w = Math.max(pw-EVOLVE_CONFIG.maxChangePerEvolve, Math.min(pw+EVOLVE_CONFIG.maxChangePerEvolve, w));
+    }
+    ds[dim]={n,betaRate:Math.round(betaRate*100)/100,avgDelta:Math.round(avgDelta*10)/10,stdDev:Math.round(stdDev*10)/10,avgBaseline:Math.round(avgBase*10)/10,classification:cls,weight:w,staleRounds:sr};
+  });
+  const wsum = Object.values(ds).reduce((s,d)=>s+d.weight,0);
+  const nf = allDims.size/Math.max(wsum,0.01);
+  allDims.forEach(dim => { if(ds[dim]){ ds[dim].weight=Math.round(ds[dim].weight*nf*100)/100; ds[dim].weight=Math.max(EVOLVE_CONFIG.weightFloor,Math.min(EVOLVE_CONFIG.weightCeil,ds[dim].weight)); } });
+  const weights={}, srState={};
+  allDims.forEach(dim => { weights[dim]=ds[dim]?ds[dim].weight:1.0; srState[dim]=ds[dim]?ds[dim].staleRounds:0; });
+  try { localStorage.setItem('geo_evolution_state',JSON.stringify({weights,staleRounds:srState,lastEvolve:Date.now(),totalComparisons:entries.length})); } catch(e) {}
+  return {weights,state:'evolved',stats:ds,totalComparisons:entries.length};
+}
+function loadLocalEvolutionWeights() {
+  try { const s=JSON.parse(localStorage.getItem('geo_evolution_state')||'{}'); return s.weights||{}; }
+  catch(e) { return {}; }
+}
+
+// ═══ AI Rewrite Engine ═══
+const REWRITE_SYSTEM_PROMPT = "You are a content editor. Your goal is to improve this article.\n\nYou are NOT told which specific dimensions are weak. Read the full text, then freely improve it while preserving the original meaning and factual boundaries.\n\nHARD CONSTRAINTS:\n1. Do NOT add facts, numbers, citations, or cases not in the original\n2. Where data support is needed, mark [needs data] — do NOT fabricate\n3. Do NOT change brands, products, prices, or commitments\n4. Keep natural human expression — do NOT template-ize\n5. Do NOT mechanically stuff keywords\n\nOutput format:\n[Rewritten Text]\n...\n[Changes Made]\n...\n[Still Needs Manual Input]\n...";
+
+function buildRewriteUserPrompt(text) { return "Please improve the following text. Preserve the original meaning. Optimize structure, expression, and readability. Do not fabricate any facts or data not in the original.\n\nOriginal:\n"+text; }
+
+async function aiRewrite() {
+  const s = JSON.parse(localStorage.getItem('geo_api_settings')||'{}');
+  if (!s.url||!s.key) { toast('Please configure API endpoint + key first'); document.getElementById('apiSettings').style.display='block'; loadApiSettings(); return; }
+  const text = document.getElementById('contentInput').value.trim();
+  if (!text) { toast('Please paste content first'); return; }
+  const btn = document.getElementById('rewriteBtn'), orig=btn.textContent;
+  btn.textContent='⏳ Rewriting...'; btn.disabled=true;
+  try {
+    const res = await fetch(s.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.key},
+      body: JSON.stringify({ model:s.model||'deepseek-chat', messages:[{role:'system',content:REWRITE_SYSTEM_PROMPT},{role:'user',content:buildRewriteUserPrompt(text)}], temperature:0.7, max_tokens:4096 }) });
+    if (!res.ok) { const et=await res.text(); throw new Error('API '+res.status+': '+et.substring(0,200)); }
+    const data = await res.json();
+    const reply = data.choices[0].message.content;
+    let body=reply, notes='', manual='';
+    const bm=reply.match(/\[Rewritten Text\]\s*([\s\S]*?)(?=\[Changes Made\]|$)/i);
+    if (bm) body=bm[1].trim();
+    const nm=reply.match(/\[Changes Made\]\s*([\s\S]*?)(?=\[Still Needs Manual Input\]|$)/i);
+    if (nm) notes=nm[1].trim();
+    const mm=reply.match(/\[Still Needs Manual Input\]\s*([\s\S]*?)$/i);
+    if (mm) manual=mm[1].trim();
+    document.getElementById('contentInput').value = body;
+    tagRewriteSource(body, 'ai_rewrite', s.model);
+    let panel='<div class="result"><h3>🤖 AI Rewrite Complete</h3>';
+    if (notes) panel+='<div style="margin-bottom:8px"><strong>Changes Made:</strong></div><div style="font-size:12px;color:var(--mu);white-space:pre-wrap;margin-bottom:12px">'+esc(notes)+'</div>';
+    if (manual) panel+='<div style="margin-bottom:4px"><strong style="color:var(--or)">⚠️ Still Needs Manual Input:</strong></div><div style="font-size:12px;color:var(--or);white-space:pre-wrap;margin-bottom:12px">'+esc(manual)+'</div>';
+    panel+='<div class="btn-row"><button class="btn btn-ac btn-sm" onclick="runCheck()">🔬 Re-Check (see score change)</button><button class="btn btn-out btn-sm" onclick="document.getElementById(\'rewritePanel\').style.display=\'none\'">Close</button></div></div>';
+    document.getElementById('rewritePanel').innerHTML=panel;
+    document.getElementById('rewritePanel').style.display='block';
+    toast('✓ Rewrite done — click Re-Check to compare scores');
+    window._justRewritten=true; window._rewriteModel=s.model;
+  } catch(e) {
+    toast('Rewrite failed: '+e.message);
+    if (e.message.includes('Failed to fetch')||e.message.includes('NetworkError')) toast('(CORS? Try proxy URL)');
+  } finally { btn.textContent=orig; btn.disabled=false; }
+}
+
+// ═══ Compare Engine ═══
+let _cmpA=null, _cmpB=null;
+function selectForCompare(id, slot) {
+  let hist=[];
+  try { hist=JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); } catch(e) {}
+  const entry = hist.find(h=>h.id===id);
+  if (!entry) return;
+  if (slot==='A') _cmpA=entry; else _cmpB=entry;
+  document.getElementById('cmp'+slot).textContent='✓ #'+id+' ('+entry.score+'%)';
+  setTimeout(()=>{ document.getElementById('cmp'+slot).textContent='Slot '+(slot==='A'?'A (old)':'B (new)'); }, 800);
+  if (_cmpA&&_cmpB) toast('Both slots filled — click Compare');
+}
+function runCompare() {
+  if (!_cmpA||!_cmpB) { toast('Select old (A) and new (B) from history first'); return; }
+  const ad=_cmpA.rawDims||_cmpA.dims, bd=_cmpB.rawDims||_cmpB.dims;
+  const dimDeltas=bd.map((d,i)=>{ const before=ad[i]?ad[i].s:0, after=d.s; return {dimension:d.n,before_raw:before,after_raw:after,delta:after-before,improved:after>before,worsened:after<before}; });
+  const improved=dimDeltas.filter(d=>d.improved).map(d=>d.dimension), worsened=dimDeltas.filter(d=>d.worsened).map(d=>d.dimension);
+  const gains={}; dimDeltas.forEach(d=>{gains[d.dimension]=d.delta;});
+  const src = getRewriteSource(_cmpB.text||'');
+  const source = src?src.source:'manual_edit', model = src?src.model:'manual';
+  // Log to evolution
+  try {
+    let elog=JSON.parse(localStorage.getItem('geo_evolution_log')||'[]');
+    elog.push({ts:Date.now(),source,model,accepted:true,
+      before_raw:Object.fromEntries(ad.map(d=>[d.n,d.s])),after_raw:Object.fromEntries(bd.map(d=>[d.n,d.s])),
+      before_weighted:_cmpA.score,after_weighted:_cmpB.score,dim_deltas:gains,improved,worsened,content_hash:(_cmpA.title||'')+(_cmpB.title||'')});
+    if(elog.length>200) elog=elog.slice(-200);
+    localStorage.setItem('geo_evolution_log',JSON.stringify(elog));
+    const evo=evolveEngine(false);
+    if(evo.state==='evolved') toast('🧬 Evolution updated ('+evo.totalComparisons+' comparisons)');
+  } catch(e) {}
+  // Display
+  let h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">';
+  h+='<div style="background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:12px"><h4>Old #'+_cmpA.id+' — '+_cmpA.score+'%</h4>';
+  ad.forEach(d=>{h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+d.icon+' '+d.n+'</span><span>'+d.s+'/'+d.m+'</span></div>';});
+  h+='</div>';
+  h+='<div style="background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:12px"><h4>New #'+_cmpB.id+' — '+_cmpB.score+'% <span style="font-size:11px">('+source+')</span></h4>';
+  bd.forEach((d,i)=>{ const delta=d.s-(ad[i]?ad[i].s:0), cls=delta>0?'color:#3fb950':delta<0?'color:#f85149':'color:var(--mu)';
+    h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+d.icon+' '+d.n+'</span><span style="'+cls+'">'+d.s+'/'+d.m+' '+(delta>0?'↑'+delta:delta<0?'↓'+Math.abs(delta):'—')+'</span></div>';});
+  h+='</div></div>';
+  document.getElementById('compareResult').innerHTML=h;
+  document.getElementById('comparePanel').style.display='block';
+}
+
 // ══════════════════════════════════════════
 // Agent API
 // window.GEOAuditor.detect("text")
@@ -914,7 +1238,7 @@ function toast(msg) {
 // ══════════════════════════════════════════
 window.GEOAuditor = {
   detect: detect,
-  version: '0.6.6',
+  version: '0.7.0',
   summarize: function(text) {
     const r = detect(text);
     return {
