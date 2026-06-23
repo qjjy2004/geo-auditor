@@ -638,18 +638,31 @@ function renderResult(r) {
   document.getElementById('resultPanel').scrollIntoView({behavior: 'smooth'});
 }
 
-// ── Copy ──
+// ── Copy (AI Rewrite Prompt for external users) ──
 function copyResult() {
   if (!window._lastResult) return;
   const r = window._lastResult;
-  let text = 'GEO Auditor Results\n';
-  text += 'Score: ' + r.total + '/' + r.maxTotal + ' (' + r.pct + '%) Grade: ' + r.grade + '\n';
-  text += '────────────────\n';
-  r.dims.forEach(d => { text += d.icon + ' ' + d.n + ': ' + d.s + '/' + d.m + ' ' + d.d + '\n'; });
-  text += '────────────────\n';
-  r.sugg.forEach(s => { text += (s.t==='fix'?'[FIX] ':'[TIP] ') + s.m + '\n'; });
-  navigator.clipboard.writeText(text).then(() => {
-    toast('✅ Copied to clipboard');
+  const text = document.getElementById('contentInput').value.trim();
+  const weakDims = r.dims.filter(d => d.s / d.m < 0.6);
+  const fixes = r.sugg.filter(s => s.t === 'fix');
+  const lang = _isCN ? 'zh' : 'en';
+
+  let prompt = '';
+  if (lang === 'zh') {
+    prompt = `你是一个GEO优化专家。以下是需要改写的文章（当前GEO得分 ${r.pct}/100，${r.grade}级）：\n\n---原文---\n${text}\n---原文完---\n\n弱项维度：\n`;
+    weakDims.forEach(d => { prompt += `- ${d.n} (${d.s}/${d.m}): ${d.d}\n`; });
+    prompt += `\n改写要求：\n`;
+    fixes.forEach(s => { prompt += `- ${s.m}\n`; });
+    prompt += `\n请直接输出改写后的完整文章。保留原意和核心信息，按上述要求优化GEO结构。`;
+  } else {
+    prompt = `You are a GEO optimization expert. Rewrite the following text (current GEO score: ${r.pct}/100, Grade ${r.grade}):\n\n---ORIGINAL---\n${text}\n---END---\n\nWeak dimensions:\n`;
+    weakDims.forEach(d => { prompt += `- ${d.n} (${d.s}/${d.m}): ${d.d}\n`; });
+    prompt += `\nRewrite requirements:\n`;
+    fixes.forEach(s => { prompt += `- ${s.m}\n`; });
+    prompt += `\nOutput the complete rewritten text. Preserve the core message, optimize for GEO structure.`;
+  }
+  navigator.clipboard.writeText(prompt).then(() => {
+    toast(lang === 'zh' ? '✅ 改写提示词已复制，粘贴给AI即可' : '✅ Rewrite prompt copied — paste to any AI');
   }).catch(() => toast('Copy failed, please select manually'));
 }
 
@@ -828,7 +841,7 @@ function saveToHistory(r) {
     score: r.pct,
     grade: r.grade,
     time: new Date().toLocaleString(),
-    text: text.substring(0, 300),
+    text: text.substring(0, 5000),
     dims: r.dims.map(d => ({n: d.n, s: d.s, m: d.m, icon: d.icon}))
   });
   if (hist.length > MAX_HIST) hist = hist.slice(0, MAX_HIST);
