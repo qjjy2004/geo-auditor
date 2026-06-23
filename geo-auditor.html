@@ -215,10 +215,8 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
 
 <script>
 // ═══ Theme toggle ═══
-const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 const saved = localStorage.getItem('geo-theme');
-const theme = saved || (prefersDark ? 'dark' : 'light');
-document.documentElement.setAttribute('data-theme', theme);
+document.documentElement.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
 function toggleTheme() {
   const el = document.documentElement;
   const cur = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
