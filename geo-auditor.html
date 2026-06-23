@@ -166,8 +166,7 @@ First line = title (optional).
 Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea>
     <div class="btn-row">
       <button class="btn btn-ac" onclick="runCheck()">Run Check</button>
-      <button class="btn btn-out btn-sm" onclick="loadSample()">Load Sample (EN)</button>
-      <button class="btn btn-out btn-sm" onclick="loadSampleCN()">加载示例 (CN)</button>
+      <button class="btn btn-out btn-sm" onclick="loadDimsSample()">📖 14维示例</button>
       <button class="btn btn-out btn-sm" onclick="clearInput()">Clear</button>
       <button class="btn btn-out btn-sm" id="copyBtn" onclick="copyResult()" style="display:none">Copy Result</button>
     </div>
@@ -563,7 +562,7 @@ function detect(text) {
 }
 
 // ── Render ──
-function runCheck() {
+function runCheck() { document.getElementById("resultContent").innerHTML="<p style='text-align:center;padding:20px;color:var(--mu)'>检测中...</p>";document.getElementById("resultPanel").style.display="block";
   const text = document.getElementById('contentInput').value.trim();
   if (!text) { toast('Please paste content first'); return; }
   const r = detect(text);
@@ -650,42 +649,149 @@ function copyResult() {
 }
 
 // ── Samples ──
-function loadSample() {
-  document.getElementById('contentInput').value = `How to pass seismic bracing inspection? 3 things inspectors actually check
+function loadDimsSample() {
+  document.getElementById('contentInput').value = `📍 Conclusion-First (10pts)
+Open with the answer — AI grabs it immediately.
+✅ Good: "Seismic bracing inspection fails for 3 reasons. Here they are."
+❌ Bad: "With the development of the construction industry, seismic bracing inspection has received increasing attention..."
 
-After 10 years installing seismic bracing, I've been through 200+ inspections. Here's the truth: 90% of failures come down to 3 things.
+📊 Data Anchors (10pts)
+Specific numbers + standard references = verifiable content.
+✅ Good: "GB50981-2014 §6.3.2 requires anchor torque ≥40N·m"
+❌ Bad: "Anchor torque must meet code requirements"
 
-1. Anchor bolt torque. Inspectors check with a calibrated torque wrench. If you used a regular wrench to save time — they'll catch it. We learned this the hard way on a hospital project in Suqian.
+🔢 Structure (8pts)
+Numbered steps + bullet lists — AI extracts structured info instantly.
+✅ Good: "Inspection in 3 steps: ①Check anchors ②Measure spacing ③Verify coating"
+❌ Bad: One long paragraph with no breaks or numbering
 
-2. Brace angle deviation. Drawings say 45 degrees, but on-site it's often 30. The inspector measures every brace. A 15-degree difference = fail.
+⚖️ Comparison (8pts)
+A vs B format has the highest AI citation rate.
+✅ Good: "Hot-dip galvanized (≥65μm) lasts 20 years. Cold galvanized rusts in 3."
+❌ Bad: "Galvanization is important"
 
-3. Channel splice overlap. Code requires 4x bolt diameter minimum. Short-cuts here are the #1 reason braces collapse in earthquakes.
+❓ FAQ Module (8pts)
+Q&A format directly matches search intent. AI loves this.
+✅ Q: "Do I need certified installers for inspection?" A: "Yes. Inspectors check certifications and trade licenses."
+❌ Narrative text with no question-answer structure
 
-Q: Do I need certified installers for inspection?
-A: Yes. The inspector checks installer certifications and company qualifications before even looking at the braces.
-Q: What happens if we fail?
-A: You get 7 days to fix it. My advice: self-inspect before the official inspection. It costs nothing and saves rework fees.
+📌 Title Quality (8pts)
+Search-intent keywords + numbers. The title determines if AI reads further.
+✅ Good: "How much does seismic bracing cost? 2026 pricing guide"
+❌ Bad: "Some information about seismic bracing"
 
-Have a project coming up? Reach out — I review drawings for free.`;
-}
+🔑 Keyword Density (8pts)
+Core term appears 3-5× naturally. AI determines topic clarity.
+✅ "seismic bracing" appears 4×, supported by "inspection" and "installation"
+❌ Core term appears once — AI can't identify the topic
 
-function loadSampleCN() {
-  document.getElementById('contentInput').value = `抗震支架怎么验收？监理最看重的3个标准
+📏 Paragraph Length (6pts)
+30-150 chars per paragraph. Good rhythm for AI parsing.
+✅ 2-3 sentences per point, blank lines between sections
+❌ One 500-char wall of text — AI can't locate information
 
-做了12年抗震支架，验收现场跑了不下200次。监理最常卡的其实就3个地方，今天一次说清楚。
+📖 Sources (6pts)
+Traceable references boost credibility.
+✅ Good: "According to 2025 emergency management data, 67% of fire pipe failures stem from bracing issues"
+❌ Bad: "Apparently many fire pipes fail because of bracing problems"
 
-第一，预埋件偏差。验收标准是水平偏差不超过±5mm，垂直偏差不超过±3mm。我们在宿迁某医院项目遇到过——预埋件偏了8mm，监理当场要求返工。解决办法：预埋后用激光水平仪复测，别省这5分钟。
+🎯 CTA (4pts)
+Give readers a next step. Increases engagement signals.
+✅ Good: "Have a project coming up? Send me your drawings — I'll review for free."
+❌ Ends abruptly with no guidance
 
-第二，支架间距超标。根据GB 50981-2014第4.3.2条，抗震支架间距不应大于设计值的1.2倍。很多施工队为了省料把间距拉到1.5倍，验收一量就翻车。
+🏢 Entity Info (8pts)
+Location, organization, time — makes content concrete and trustworthy.
+✅ Good: "Suqian Shidai Yinghuayuan project, passed inspection March 2025"
+❌ Bad: "Some project passed inspection some time ago"
 
-第三，防腐处理不到位。2026年新规明确要求：所有外露金属件必须做热浸镀锌处理，镀锌层厚度≥65μm。喷漆的、冷镀的、薄镀的——全都不合格。
+🛡️ EEAT (8pts)
+Experience + credentials + third-party validation = authority.
+✅ Good: "12 years in MEP installation, 200+ projects, licensed Professional Engineer"
+❌ No experience or credential mentioned at all
 
-Q：抗震支架必须找专业公司验收吗？
-A：是的。监理会查安装单位的资质和人员的特种作业证书。自己装的必须补。
-Q：验收不过怎么办？
-A：整改通知单下来有7天整改期。建议提前自检，别等监理来才发现问题。
+🎯 Semantic Match (4pts)
+Title promise matches body content. Don't bait-and-switch.
+✅ Title: "How to pass inspection" → Body: inspection steps
+❌ Title: "How to pass inspection" → Body: "Types of bracing brackets"
 
-有项目需要咨询验收？12年经验，私信我。`;
+🤖 Anti-AI Voice (4pts)
+Strip "furthermore" / "in conclusion" — write like a human.
+✅ Good: "Honestly, nobody uses a torque wrench on site — but that's exactly what the inspector checks"
+❌ Bad: "Furthermore, it is worth noting that, in conclusion, anchor torque is of significant importance"
+
+——— CN / 中文版 ———
+
+📍 结论前置（10分）
+开头直接给答案，AI一眼能抓取核心观点。
+✅ 好：「抗震支架验收不过，90%是这三个原因」
+❌ 差：「随着建筑行业发展，抗震支架验收日益受到各方重视…」
+
+📊 数据锚点（10分）
+有具体数字、规范编号能让AI判定内容可验证。
+✅ 好：「GB50981-2014第6.3.2条要求锚栓扭矩≥40N·m」
+❌ 差：「锚栓扭矩要符合规范要求」
+
+🔢 结构层次（8分）
+分步骤、列要点，AI直接提取结构化信息。
+✅ 好：「验收三步：①查锚栓 ②量间距 ③看防腐」
+❌ 差：一整段讲完所有内容，没有编号或列表
+
+⚖️ 对比分析（8分）
+A vs B、达标 vs 不达标，对比格式AI引用率最高。
+✅ 好：「热浸镀锌（≥65μm）能用20年，冷镀锌3年就锈」
+❌ 差：「镀锌处理很重要」
+
+❓ FAQ模块（8分）
+问答格式直接匹配搜索意图，AI最爱引用。
+✅ Q：「抗震支架必须找专业公司验收吗？」A：「是的，监理会查资质和特种作业证」
+❌ 一整段叙述式说明，没有问答结构
+
+📌 标题质量（8分）
+含搜索意图词+数字，标题决定AI是否往下看。
+✅ 好：「抗震支架多少钱一套？2026年最新报价对比」
+❌ 差：「关于抗震支架的一些介绍」
+
+🔑 关键词密度（8分）
+核心词重复3-5次（不过度堆砌），AI判定主题明确。
+✅ 核心词「抗震支架」出现4次，辅以「验收」「安装」
+❌ 核心词只出现1次，AI不知道文章在讲什么
+
+📏 段落长度（6分）
+每段30-150字，节奏舒适，AI好解析。
+✅ 每段2-3句话讲一个点，段间空行分隔
+❌ 一段500字不分段，AI无法快速定位信息
+
+📖 引用来源（6分）
+可追溯的出处增强可信度。
+✅ 好：「据应急管理部2025年数据，消防管道破损67%源于支架失效」
+❌ 差：「据说很多消防管道破损是因为支架问题」
+
+🎯 行动号召（4分）
+结尾给读者下一步动作，增加互动。
+✅ 好：「有项目要验收？发图纸我帮你看看→私信」
+❌ 结尾戛然而止，没有引导
+
+🏢 实体信息（8分）
+地点、机构、时间让内容具体可信。
+✅ 好：「宿迁时代映花园项目，2025年3月验收通过」
+❌ 差：「某项目某年某月验收通过」
+
+🛡️ EEAT权威（8分）
+经验+资质+第三方验证，AI判定专业度。
+✅ 好：「12年机电安装，经手200+项目，持有一级建造师证」
+❌ 没有任何经验或资质说明
+
+🎯 语义匹配（4分）
+标题承诺的和正文讲的要一致，不跑偏。
+✅ 标题问「怎么验收」→ 正文讲验收步骤
+❌ 标题问「怎么验收」→ 正文讲「支架种类介绍」
+
+🤖 去AI腔（4分）
+去掉「此外」「总而言之」等AI模板词，改用口语。
+✅ 好：「说真的，工地上谁拿扭力扳手啊——但监理就查这个」
+❌ 差：「此外，值得注意的是，综上所述，锚栓扭矩具有重要意义」
+`;
 }
 
 function clearInput() {
