@@ -143,46 +143,50 @@ footer a { color: var(--ac); text-decoration: none; }
 <body>
 <div class="container">
   <header>
-    <h1>GEO Auditor <span style="font-size:.5em;color:var(--mu);font-weight:400">v0.7.0 · Self-Evolving</span></h1>
-    <p>Detect → Rewrite → Compare → Evolve. A self-improving content engine that learns from every rewrite.</p>
+    <h1><span data-en="GEO Auditor" data-zh="GEO 检测器">GEO Auditor</span> <span style="font-size:.5em;color:var(--mu);font-weight:400">v0.7.0 · <span data-en="Self-Evolving" data-zh="自我进化">Self-Evolving</span></span></h1>
+    <p data-en="Detect → Rewrite → Compare → Evolve. A self-improving content engine that learns from every rewrite." data-zh="检测 → 改写 → 对比 → 进化。一个从每次改写中学习的自适应内容引擎。">Detect → Rewrite → Compare → Evolve. A self-improving content engine that learns from every rewrite.</p>
     <div class="badges">
-      <span class="badge">AI Rewrite</span>
-      <span class="badge">Self-Evolving</span>
-      <span class="badge">Agent API</span>
-      <span class="badge">Zero Config</span>
-      <span class="badge">Local Only</span>
+      <span class="badge" data-en="AI Rewrite" data-zh="AI 改写">AI Rewrite</span>
+      <span class="badge" data-en="Self-Evolving" data-zh="自我进化">Self-Evolving</span>
+      <span class="badge" data-en="Agent API" data-zh="Agent API">Agent API</span>
+      <span class="badge" data-en="Zero Config" data-zh="零配置">Zero Config</span>
+      <span class="badge" data-en="Local Only" data-zh="纯本地">Local Only</span>
       <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light">🌙</button>
+      <button class="theme-toggle" onclick="toggleLang()" title="中文/English" style="font-size:11px" id="langBtn">中文</button>
     </div>
   </header>
 
   <div class="tabs">
-    <button class="tab active" onclick="showTab('check', event)">Check</button>
-    <button class="tab" onclick="showTab('history', event)">History</button>
-    <button class="tab" onclick="showTab('compare', event)">Compare</button>
+    <button class="tab active" onclick="showTab('check', event)" data-en="Check" data-zh="检测">Check</button>
+    <button class="tab" onclick="showTab('history', event)" data-en="History" data-zh="历史">History</button>
+    <button class="tab" onclick="showTab('compare', event)" data-en="Compare" data-zh="对比">Compare</button>
   </div>
 
   <div id="checkPanel">
-    <textarea id="contentInput" placeholder="Paste your content here...
+    <textarea id="contentInput" data-en-placeholder="Paste your content here...
 First line = title (optional).
 
-Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea>
+Tip: Works in English, Chinese, or mixed. No industry preset needed." data-zh-placeholder="粘贴你的内容...
+首行自动识别为标题（可选）。
+
+提示：支持英文、中文或混合。无需行业预设。"></textarea>
     <div class="btn-row">
-      <button class="btn btn-ac" onclick="runCheck()">Run Check</button>
-      <button class="btn btn-out btn-sm" onclick="loadDimsSample()">📖 14维示例</button>
-      <button class="btn btn-ac btn-sm" id="rewriteBtn" onclick="aiRewrite()" style="display:none;background:var(--or)">🤖 AI Rewrite</button>
-      <button class="btn btn-out btn-sm" onclick="toggleApiSettings()" style="font-size:11px">⚙️ API</button>
-      <button class="btn btn-out btn-sm" onclick="clearInput()">Clear</button>
-      <button class="btn btn-out btn-sm" id="copyBtn" onclick="copyResult()" style="display:none">Copy Result</button>
+      <button class="btn btn-ac" onclick="runCheck()" data-en="Run Check" data-zh="🔬 检测">Run Check</button>
+      <button class="btn btn-out btn-sm" onclick="loadDimsSample()">📖 <span data-en="14-Dim Sample" data-zh="14维示例">14-Dim Sample</span></button>
+      <button class="btn btn-ac btn-sm" id="rewriteBtn" onclick="aiRewrite()" style="display:none;background:var(--or)">🤖 <span data-en="AI Rewrite" data-zh="AI 改写">AI Rewrite</span></button>
+      <button class="btn btn-out btn-sm" onclick="toggleApiSettings()" style="font-size:11px">⚙️ <span data-en="API" data-zh="API">API</span></button>
+      <button class="btn btn-out btn-sm" onclick="clearInput()" data-en="Clear" data-zh="清空">Clear</button>
+      <button class="btn btn-out btn-sm" id="copyBtn" onclick="copyResult()" style="display:none" data-en="Copy Result" data-zh="复制结果">Copy Result</button>
     </div>
-    <div style="margin-top:8px;color:var(--mu);font-size:11px;line-height:1.5">💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from.</div>
+    <div style="margin-top:8px;color:var(--mu);font-size:11px;line-height:1.5" data-en="💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from." data-zh="💡 AI 改写为可选功能。你也可从 ChatGPT、Claude 等任意工具改写后粘贴回来重新检测——保存即自动对比，演化引擎不关心改写来源。">💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from.</div>
     <div id="apiSettings" style="display:none;margin-top:12px;padding:12px;background:var(--card);border:1px solid var(--bd);border-radius:6px;font-size:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label style="color:var(--tx)">Endpoint <input id="apiUrl" placeholder="https://api.deepseek.com/v1/chat/completions" style="width:260px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
         <label style="color:var(--tx)">Key <input id="apiKey" type="password" placeholder="sk-..." style="width:180px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
         <label style="color:var(--tx)">Model <input id="apiModel" placeholder="deepseek-chat" style="width:130px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
-        <button class="btn btn-ac btn-sm" onclick="saveApiSettings()">Save</button>
+        <button class="btn btn-ac btn-sm" onclick="saveApiSettings()" data-en="Save" data-zh="保存">Save</button>
       </div>
-      <div style="margin-top:6px;color:var(--mu);font-size:11px">Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked.</div>
+      <div style="margin-top:6px;color:var(--mu);font-size:11px" data-en="Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked." data-zh="Key 仅存本机浏览器 localStorage，不经过任何服务器。OpenAI 兼容接口（DeepSeek/OpenAI/Gemini 兼容网关）。遇 CORS 需配代理地址。">Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked.</div>
     </div>
     <div id="rewritePanel" style="display:none;margin-top:16px"></div>
     <div class="result" id="resultPanel">
@@ -214,28 +218,28 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
   <div id="historyPanel" style="display:none;">
     <div class="hist-list" id="histList"><p style="color:var(--mu);text-align:center;padding:30px">No history yet</p></div>
     <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-out btn-sm" onclick="clearHistory()">Clear History</button>
+      <button class="btn btn-out btn-sm" onclick="clearHistory()" data-en="Clear History" data-zh="清空历史">Clear History</button>
     </div>
     <div id="evoDataPanel" style="margin-top:10px;padding:10px;background:var(--card);border:1px solid var(--bd);border-radius:6px;font-size:12px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <strong style="color:var(--tx)">🧬 演化数据</strong>
-        <span style="color:var(--or);font-size:11px">⚠️ 清除浏览器缓存会丢失所有演化数据</span>
+        <strong style="color:var(--tx)"><span data-en="Evolution Data" data-zh="演化数据">Evolution Data</span></strong>
+        <span style="color:var(--or);font-size:11px" data-en="⚠️ Clearing browser cache will lose all evolution data" data-zh="⚠️ 清除浏览器缓存会丢失所有演化数据">⚠️ Clearing browser cache will lose all evolution data</span>
       </div>
       <div class="btn-row" style="margin-top:6px">
-        <button class="btn btn-out btn-sm" onclick="exportEvoData()">📥 导出</button>
-        <button class="btn btn-out btn-sm" onclick="document.getElementById('importEvoFile').click()">📤 导入</button>
+        <button class="btn btn-out btn-sm" onclick="exportEvoData()"><span data-en="📥 Export" data-zh="📥 导出">📥 Export</span></button>
+        <button class="btn btn-out btn-sm" onclick="document.getElementById('importEvoFile').click()"><span data-en="📤 Import" data-zh="📤 导入">📤 Import</span></button>
         <input type="file" id="importEvoFile" accept=".json" style="display:none" onchange="importEvoData(this)">
         <span style="color:var(--mu);font-size:11px" id="evoStats"></span>
       </div>
     </div>
   <div id="comparePanel" style="display:none;">
-    <p style="font-size:13px;color:var(--mu);margin-bottom:16px">Select old (A) and new (B) from history, then click Compare to see per-dimension changes.</p>
+    <p style="font-size:13px;color:var(--mu);margin-bottom:16px" data-en="Select old (A) and new (B) from history, then click Compare to see per-dimension changes." data-zh="从历史记录里选旧版(A)和新版(B)，点对比查看各维度得分变化。">Select old (A) and new (B) from history, then click Compare to see per-dimension changes.</p>
     <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
-      <button class="btn btn-out btn-sm" id="cmpA" onclick="navigator.clipboard?null:null" style="min-width:120px">Slot A (old)</button>
+      <button class="btn btn-out btn-sm" id="cmpA" onclick="navigator.clipboard?null:null" style="min-width:120px"><span data-en="Slot A (old)" data-zh="A 槽 (旧版)">Slot A (old)</span></button>
       <span style="color:var(--mu)">vs</span>
-      <button class="btn btn-out btn-sm" id="cmpB" style="min-width:120px">Slot B (new)</button>
-      <button class="btn btn-ac btn-sm" onclick="runCompare()">⚖️ Compare</button>
-      <button class="btn btn-out btn-sm" onclick="_cmpA=null;_cmpB=null;document.getElementById('cmpA').textContent='Slot A (old)';document.getElementById('cmpB').textContent='Slot B (new)';document.getElementById('compareResult').innerHTML=''">Clear</button>
+      <button class="btn btn-out btn-sm" id="cmpB" style="min-width:120px"><span data-en="Slot B (new)" data-zh="B 槽 (新版)">Slot B (new)</span></button>
+      <button class="btn btn-ac btn-sm" onclick="runCompare()" data-en="⚖️ Compare" data-zh="⚖️ 对比">⚖️ Compare</button>
+      <button class="btn btn-out btn-sm" onclick="_cmpA=null;_cmpB=null;document.getElementById('cmpA').textContent='Slot A (old)';document.getElementById('cmpB').textContent='Slot B (new)';document.getElementById('compareResult').innerHTML=''" data-en="Clear" data-zh="清空">Clear</button>
     </div>
     <div id="compareResult"></div>
   </div>
@@ -244,7 +248,7 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed."></textarea
 <footer>
   <a href="https://github.com/liangjia-tech/geo-auditor" target="_blank">GitHub</a> · 
   <a href="https://zhibi.xyz" target="_blank">LiangJia Tech</a> · 
-  MIT License
+  <span data-en="MIT License" data-zh="MIT 开源">MIT License</span>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -259,6 +263,30 @@ function toggleTheme() {
   el.setAttribute('data-theme', cur);
   localStorage.setItem('geo-theme', cur);
 }
+
+// ═══ Language toggle (UI only — detection engine auto-switches separately) ═══
+let UI_LANG = localStorage.getItem('geo-lang') || 'en';
+function T(en, zh) { return UI_LANG === 'zh' ? zh : en; }
+function toggleLang() {
+  UI_LANG = UI_LANG === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('geo-lang', UI_LANG);
+  applyUILang();
+}
+function applyUILang() {
+  document.getElementById('langBtn').textContent = UI_LANG === 'zh' ? 'EN' : '中文';
+  document.querySelectorAll('[data-en]').forEach(el => {
+    el.textContent = UI_LANG === 'zh' ? (el.getAttribute('data-zh')||el.textContent) : el.getAttribute('data-en');
+  });
+  document.querySelectorAll('[data-en-placeholder]').forEach(el => {
+    el.placeholder = UI_LANG === 'zh' ? el.getAttribute('data-zh-placeholder') : el.getAttribute('data-en-placeholder');
+  });
+  // Update dynamic panels if visible
+  if (document.getElementById('historyPanel').style.display !== 'none') loadHistory();
+  updateEvoStats();
+}
+// Run on load
+document.addEventListener('DOMContentLoaded', applyUILang);
+applyUILang();
 
 // ══════════════════════════════════════════
 // GEO Auditor v0.6.6 — 14-dimension engine
@@ -626,7 +654,7 @@ function detect(text, evoWeights) {
 // ── Render ──
 function runCheck() { document.getElementById("resultContent").innerHTML="<p style='text-align:center;padding:20px;color:var(--mu)'>检测中...</p>";document.getElementById("resultPanel").style.display="block";
   const text = document.getElementById('contentInput').value.trim();
-  if (!text) { toast('Please paste content first'); return; }
+  if (!text) { toast(T('Please paste content first','请先粘贴内容')); return; }
   const evoWeights = loadLocalEvolutionWeights();
   const r = detect(text, evoWeights);
   renderResult(r);
@@ -670,7 +698,7 @@ function dismissSurvey() {
 }
 
 function renderResult(r) {
-  const gradeLabels={'S':L('🏆 Excellent','🏆 优秀'),'A':L('✅ Good','✅ 良好'),'B':L('⚠️ Needs Work','⚠️ 需改进'),'C':L('❌ Rewrite','❌ 重写')};
+  const gradeLabels={'S':T('🏆 Excellent','🏆 优秀'),'A':T('✅ Good','✅ 良好'),'B':T('⚠️ Needs Work','⚠️ 需改进'),'C':T('❌ Rewrite','❌ 重写')};
   let evoBadge = '';
   if (r.rawPct !== r.adaptivePct) {
     const diff = r.adaptivePct - r.rawPct;
@@ -694,7 +722,7 @@ function renderResult(r) {
       </div>
       <div class="dim-desc">${di.d}</div>
     `).join('')}
-    <h4 style="margin-top:16px;font-size:14px;color:#fff">💡 Suggestions</h4>
+    <h4 style="margin-top:16px;font-size:14px;color:#fff">💡 ${T('Suggestions','改进建议')}</h4>
     ${r.sugg.map(s => `<div class="sug ${s.t}">${s.m}</div>`).join('')}
   `;
   document.getElementById('resultContent').innerHTML = html;
