@@ -369,6 +369,10 @@ function escRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// ── Shared language detection (used by detect, renderResult, copyResult) ──
+let _lastIsCN = false;
+function L(en, zh) { return _lastIsCN ? zh : en; }
+
 // ── Core Detection Engine ──
 function detect(text, evoWeights) {
   evoWeights = evoWeights || {};
@@ -377,7 +381,8 @@ function detect(text, evoWeights) {
   const cnChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length;
   const totalChars = Math.max(cleanText.replace(/\s/g, '').length, 1);
   const isCN = cnChars / totalChars > 0.4;
-  const L = (en, zh) => isCN ? zh : en;
+  _lastIsCN = isCN;
+  
   const lines = text.split('\n');
   const firstLine = (lines[0] || '').trim();
   const title = firstLine && firstLine.length < 80 ? firstLine : '';
@@ -704,7 +709,7 @@ function copyResult() {
   const text = document.getElementById('contentInput').value.trim();
   const weakDims = r.dims.filter(d => d.s / d.m < 0.6);
   const fixes = r.sugg.filter(s => s.t === 'fix');
-  const lang = _isCN ? 'zh' : 'en';
+  const lang = _lastIsCN ? 'zh' : 'en';
 
   let prompt = '';
   if (lang === 'zh') {
