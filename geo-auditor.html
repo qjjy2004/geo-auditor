@@ -653,13 +653,13 @@ function copyResult() {
     weakDims.forEach(d => { prompt += `- ${d.n} (${d.s}/${d.m}): ${d.d}\n`; });
     prompt += `\n改写要求：\n`;
     fixes.forEach(s => { prompt += `- ${s.m}\n`; });
-    prompt += `\n请直接输出改写后的完整文章。保留原意和核心信息，按上述要求优化GEO结构。`;
+    prompt += `\n请直接输出改写后的完整文章。保留原意和核心信息，按上述要求优化GEO结构。如果改写效果不理想，请人工调整。`;
   } else {
     prompt = `You are a GEO optimization expert. Rewrite the following text (current GEO score: ${r.pct}/100, Grade ${r.grade}):\n\n---ORIGINAL---\n${text}\n---END---\n\nWeak dimensions:\n`;
     weakDims.forEach(d => { prompt += `- ${d.n} (${d.s}/${d.m}): ${d.d}\n`; });
     prompt += `\nRewrite requirements:\n`;
     fixes.forEach(s => { prompt += `- ${s.m}\n`; });
-    prompt += `\nOutput the complete rewritten text. Preserve the core message, optimize for GEO structure.`;
+    prompt += `\nOutput the complete rewritten text. Preserve the core message, optimize for GEO structure. If the result is unsatisfactory, revise manually.`;
   }
   navigator.clipboard.writeText(prompt).then(() => {
     toast(lang === 'zh' ? '✅ 改写提示词已复制，粘贴给AI即可' : '✅ Rewrite prompt copied — paste to any AI');
