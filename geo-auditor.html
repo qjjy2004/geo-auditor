@@ -334,6 +334,11 @@ function escRegex(s) {
 
 // ── Core Detection Engine ──
 function detect(text) {
+  const cleanText = text.replace(/[^\w\s\u4e00-\u9fff]/g, ' ');
+  const cnChars = (cleanText.match(/[\u4e00-\u9fff]/g) || []).length;
+  const totalChars = Math.max(cleanText.replace(/\s/g, '').length, 1);
+  const isCN = cnChars / totalChars > 0.4;
+  const L = (en, zh) => isCN ? zh : en;
   const lines = text.split('\n');
   const firstLine = (lines[0] || '').trim();
   const title = firstLine && firstLine.length < 80 ? firstLine : '';
@@ -345,21 +350,21 @@ function detect(text) {
   let firstPara = (body.trim().split('\n')[0] || '').substring(0, 120);
   let hasConclusion = /answer|conclusion|core|key|bottom.line|the.point|simply.put|heres.the.thing|答案|结论|核心|关键|说白了|说真的|直接|就是|一句话/i.test(firstPara) && firstPara.length >= 25;
   let cf = hasConclusion ? 10 : firstPara.length >= 20 ? 6 : 2;
-  dims.push({n:'Conclusion-First', s:cf, m:10, d:cf>=9?'Clear opening — AI can extract immediately':cf>=5?'Has intro but lead with answer next time':'Missing conclusion — AI prefers answer-first', icon:'📍'});
+  dims.push({n:L('Conclusion-First','结论前置'), s:cf, m:10, d:cf>=9?L('Clear opening','开门见山'):cf>=5?L('Has intro but lead with answer next time','有开头但不够直接'):L('Missing conclusion','缺少结论'), icon:'📍'});
   total += cf;
 
   // 2. Data Anchors 10
   let nm = countMatches(ft, /\d+\.?\d*\s*(billion|million|thousand|hundred|%|USD|EUR|CNY|¥|\$|€|kg|km|mm|cm|m|t|℃|°F|years|months|days|hours|times|users|people|亿|万|千|百|元|套|个|次|年|月|日|条|家|N·m|kN|MPa|吨)/gi);
   let sm = countMatches(ft, /reference|source|citation|standard|spec|according.to|reported.by|study|survey|research|data.from|参考|来源|标准|规范|据.*显示|第.*条/gi);
   let da = nm >= 4 && sm >= 2 ? 10 : nm >= 3 && sm >= 1 ? 8 : nm >= 3 ? 7 : nm >= 2 && sm >= 1 ? 6 : nm >= 2 ? 5 : sm >= 3 ? 4 : sm >= 1 ? 3 : nm >= 1 ? 2 : 0;
-  dims.push({n:'Data Anchors', s:da, m:10, d:(da>=9?'Excellent':da>=5?'Decent':'Add specific numbers and sources') + ` (${nm} data pts + ${sm} refs)`, icon:'📊'});
+  dims.push({n:L('Data Anchors','数据锚点'), s:da, m:10, d:(da>=9?L('Excellent','优秀'):da>=5?L('Decent','不错'):L('Add numbers & sources','加数字和来源')) + ` (${nm} `+L('data pts','数据')+` + ${sm} `+L('refs','引用')+`)`, icon:'📊'});
   total += da;
 
   // 3. Structure 8
   let st = countMatches(body, /first|second|third|finally|step\s*\d|第[一二三四五六七八九十\d]|步骤|首先|然后|其次|最后|第一|第二|第三|\d+[\.、\)]\s*\S/gi);
   let bu = countMatches(body, /^[\-\*•]\s/gm);
   let ss = st + bu >= 4 ? 8 : st + bu >= 2 ? 6 : st + bu >= 1 ? 3 : 1;
-  dims.push({n:'Structure', s:ss, m:8, d:`${st} steps + ${bu} bullets. ${ss>=7?'Well structured':ss>=4?'Has basic structure':'Add numbered steps or bullets'}`, icon:'🔢'});
+  dims.push({n:L('Structure','结构层次'), s:ss, m:8, d:`${st} `+L('steps','步骤')+` + ${bu} `+L('bullets','列表')+`. ${ss>=7?L('Well structured','结构清晰'):ss>=4?L('Has basic structure','有基本结构'):L('Add steps or bullets','加分步或列表')}`, icon:'🔢'});
   total += ss;
 
   // 4. Comparison 8
@@ -367,13 +372,13 @@ function detect(text) {
   let cmNum = countMatches(ft, /\d+\s*(%|degrees|times|years|days|倍|度).{0,30}\d+\s*(%|degrees|times|years|days|倍|度)/g);
   let totalCm = cm + cmNum;
   let cs = totalCm >= 3 ? 8 : totalCm >= 1 ? 5 : 2;
-  dims.push({n:'Comparison', s:cs, m:8, d:`${totalCm} comparison(s). ${cs>=7?'Strong':cs>=4?'Add more A vs B':'Missing contrast — add comparisons'}`, icon:'⚖️'});
+  dims.push({n:L('Comparison','对比分析'), s:cs, m:8, d:`${totalCm} `+L('comparison(s)','处对比')+`. ${cs>=7?L('Strong','对比充分'):cs>=4?L('Add more A vs B','加更多对比'):L('Missing contrast','缺少对比')}`, icon:'⚖️'});
   total += cs;
 
   // 5. FAQ Module 8
   let qa = countMatches(body, /Q[：:]\s|A[：:]\s|Q&A|FAQ|问[：:]|答[：:]|常见问题/gi);
   let qs = qa >= 4 ? 8 : qa >= 2 ? 6 : qa >= 1 ? 3 : 1;
-  dims.push({n:'FAQ Module', s:qs, m:8, d:`${qa} Q&A pairs. ${qs>=6?'Rich FAQ':qs>=3?'Has Q&A elements':'Add 2-3 Q&As — AI loves answering questions'}`, icon:'❓'});
+  dims.push({n:L('FAQ Module','FAQ模块'), s:qs, m:8, d:`${qa} `+L('Q&A pairs','个问答')+`. ${qs>=6?L('Rich FAQ','FAQ丰富'):qs>=3?L('Has Q&A elements','有问答元素'):L('Add 2-3 Q&As','加2-3个问答')}`, icon:'❓'});
   total += qs;
 
   // 6. Title Quality 8
@@ -381,7 +386,7 @@ function detect(text) {
       hi = /how|what|why|which|when|where|who|guide|tutorial|tips|怎么|如何|什么|哪|为什么|多少|吗|教程|指南|攻略|方法|技巧|案例/i.test(title),
       hn = /\d/.test(title);
   let tq = hk && hi && hn ? 8 : hk && hi ? 6 : hk && hn ? 5 : hk ? 3 : 1;
-  dims.push({n:'Title Quality', s:tq, m:8, d:tq>=7?'Title has search intent + number — ideal':tq>=5?'Good, add a number':tq>=2?'Add search intent keywords':'No valid title detected', icon:'📌'});
+  dims.push({n:L('Title Quality','标题质量'), s:tq, m:8, d:tq>=7?L('Search intent + number — ideal','搜索意图+数字，理想'):tq>=5?L('Good, add a number','不错，加个数字'):tq>=2?L('Add search intent keywords','加搜索关键词'):L('No valid title detected','未检测到有效标题'), icon:'📌'});
   total += tq;
 
   // 7. Keyword Density 8 — auto-extract topic words
@@ -395,26 +400,26 @@ function detect(text) {
     else if (c >= 1 && kwScore < 4) { kwScore = 4; kwTop = phrase; }
   }
   if (!kwScore) { kwScore = 2; kwTop = '(auto-detect failed)'; }
-  dims.push({n:'Keyword Density', s:kwScore, m:8, d:kwScore>=7?`"${kwTop}" well covered (≥3x)`:kwScore>=4?`"${kwTop}" sparse — aim for 3-5x`:'Topic keywords undetectable', icon:'🔑'});
+  dims.push({n:L('Keyword Density','关键词密度'), s:kwScore, m:8, d:kwScore>=7?`"${kwTop}" well covered (≥3x)`:kwScore>=4?`"${kwTop}" sparse — aim for 3-5x`:L('Topic keywords undetectable','未检测到主题词'), icon:'🔑'});
   total += kwScore;
 
   // 8. Paragraph Length 6
   let paras = body.split('\n\n').filter(p => p.trim());
   let avg = paras.reduce((s, p) => s + p.length, 0) / Math.max(paras.length, 1);
   let pl = avg >= 30 && avg <= 150 ? 6 : avg >= 15 && avg <= 300 ? 4 : 2;
-  dims.push({n:'Paragraph Length', s:pl, m:6, d:`Avg ${Math.round(avg)} chars/para. ${pl>=5?'Good rhythm':pl>=3?'A bit long/short':'Adjust paragraph length'}`, icon:'📏'});
+  dims.push({n:L('Paragraph Length','段落长度'), s:pl, m:6, d:`Avg ${Math.round(avg)} `+L('chars/para','字/段')+`. ${pl>=5?L('Good rhythm','节奏舒适'):pl>=3?L('A bit long/short','偏长或偏短'):L('Adjust paragraph length','调整段落长度')}`, icon:'📏'});
   total += pl;
 
   // 9. Sources 6
   let rf = countMatches(ft, /reference|source|citation|according.to|study|survey|published|reported|data.from|verified.by|link|参考|来源|引用|据.*显示|检测报告|调查|研究表明/gi);
   let rs = rf >= 3 ? 6 : rf >= 1 ? 4 : 1;
-  dims.push({n:'Sources', s:rs, m:6, d:`${rf} traceable sources. ${rs>=5?'Credible':rs>=3?'Has some — add more':'Add citations or data sources'}`, icon:'📖'});
+  dims.push({n:L('Sources','引用来源'), s:rs, m:6, d:`${rf} `+L('traceable sources','处可追溯来源')+`. ${rs>=5?L('Credible','可信'):rs>=3?L('Has some','有一些'):L('Add citations','加引用或数据来源')}`, icon:'📖'});
   total += rs;
 
   // 10. CTA 4
   let ct = countMatches(ft, /subscribe|follow|share|comment|contact|reach.out|try|sign.up|download|learn.more|get.started|私信|联系|咨询|关注|扫描|点击|评论|加微信|打电话|聊聊/gi);
   let cc = ct >= 1 ? 4 : 1;
-  dims.push({n:'CTA', s:cc, m:4, d:ct>=1?'Has call-to-action':'Add a CTA at the end', icon:'🎯'});
+  dims.push({n:L('CTA','行动号召'), s:cc, m:4, d:ct>=1?L('Has call-to-action','有行动号召'):L('Add a CTA at the end','结尾加CTA'), icon:'🎯'});
   total += cc;
 
   // 11. Entity Info 8
@@ -424,7 +429,7 @@ function detect(text) {
   else if (entScore >= 2) entScore = 6;
   else if (entScore >= 1) entScore = 3;
   else entScore = 1;
-  dims.push({n:'Entity Info', s:entScore, m:8, d:entScore>=6?'Rich location/org/time info':entScore>=3?'Has basic entity info':'Add location and organization names', icon:'🏢'});
+  dims.push({n:L('Entity Info','实体信息'), s:entScore, m:8, d:entScore>=6?L('Rich location/org/time info','地点/机构/时间信息丰富'):entScore>=3?L('Has basic entity info','有基本实体信息'):L('Add location and organization names','加地点和机构名称'), icon:'🏢'});
   total += entScore;
 
   // 12. EEAT 8
@@ -437,14 +442,14 @@ function detect(text) {
   else if (eeat >= 4) eeat = 6;
   else if (eeat >= 2) eeat = 4;
   else eeat = 2;
-  dims.push({n:'EEAT', s:eeat, m:8, d:eeat>=7?'Strong E-E-A-T signals':eeat>=5?'Decent authority':'Add experience/credentials/citations', icon:'🛡️'});
+  dims.push({n:L('EEAT','EEAT权威'), s:eeat, m:8, d:eeat>=7?L('Strong E-E-A-T signals','权威信号强'):eeat>=5?L('Decent authority','有一定权威'):L('Add experience/credentials/citations','加经验/资质/引用'), icon:'🛡️'});
   total += eeat;
 
   // 13. Semantic Match 4
   let sem = 0;
   if (/how|what|why|which|when|where|who|怎么|如何|什么|哪|为什么|多少|吗/i.test(title)) sem += 2;
   if (/because|therefore|reason|answer|key|core|因为|所以|原因|答案|关键|核心/i.test(body.substring(0, 200))) sem += 2;
-  dims.push({n:'Semantic Match', s:sem, m:4, d:sem>=3?'Title-content intent aligned':sem>=1?'Partial match':'Title and content intent mismatch', icon:'🎯'});
+  dims.push({n:L('Semantic Match','语义匹配'), s:sem, m:4, d:sem>=3?L('Title-content intent aligned','标题和内容一致'):sem>=1?L('Partial match','部分匹配'):L('Title and content mismatch','标题和内容不匹配'), icon:'🎯'});
   total += sem;
 
   // 14. Anti-AI Voice 4 — research-backed 6-signal detection
@@ -540,7 +545,7 @@ function detect(text) {
               deai >= 1 ? 'Mixed signals: ' + reasons.join(', ') :
               'Heavy AI voice: ' + reasons.join(', ');
   
-  dims.push({n:'Anti-AI Voice', s:deai, m:4, d:deaiD, icon:'🤖'});
+  dims.push({n:L('Anti-AI Voice','去AI腔'), s:deai, m:4, d:deaiD, icon:'🤖'});
   total += deai;
 
   let pct = Math.round(total / maxTotal * 100);
@@ -548,7 +553,7 @@ function detect(text) {
   let circleCls = grade === 'S' ? 's-great' : grade === 'A' ? 's-good' : grade === 'B' ? 's-ok' : 's-poor';
   let sugg = [];
   dims.forEach(d => { if (d.s / d.m < 0.5) sugg.push({t:'fix', m:`${d.n} low: ${d.d}`}); });
-  if (sugg.length < 2) sugg.push({t:'good', m:'Overall GEO-friendly. Keep publishing similar quality content.'});
+  if (sugg.length < 2) sugg.push({t:'good', m:L('Overall GEO-friendly. Keep publishing.','整体GEO友好度良好。')});
 
   return { title, total, maxTotal, pct, grade, circleCls, dims, sugg, 
            textLength: ft.length, paraCount: paras.length, avgParaLen: Math.round(avg), dataCount: nm,
@@ -606,7 +611,7 @@ function dismissSurvey() {
 }
 
 function renderResult(r) {
-  const gradeLabels = {'S':'🏆 Excellent','A':'✅ Good','B':'⚠️ Needs Work','C':'❌ Rewrite'};
+  const gradeLabels={'S':L('🏆 Excellent','🏆 优秀'),'A':L('✅ Good','✅ 良好'),'B':L('⚠️ Needs Work','⚠️ 需改进'),'C':L('❌ Rewrite','❌ 重写')};
   let html = `
     <div class="${r.circleCls} score-circle">${r.pct}%</div>
     <div class="grade">${gradeLabels[r.grade]} · ${r.total}/${r.maxTotal} pts</div>
