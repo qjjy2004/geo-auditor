@@ -150,7 +150,7 @@ python3 geo_auditor.py --agent-prompt
 
 **Is my content sent anywhere?** No. Zero network calls. Everything runs locally.
 
-**What's different from GPTZero / Originality.ai?** They detect AI-generated text. GEO Auditor measures **AI search citation quality** — content that scores well is optimized for being cited by AI search engines (豆包, DeepSeek, ChatGPT).
+**What's different from GPTZero / Originality.ai?** They detect AI-generated text. GEO Auditor measures **AI search citation quality** — content that scores well is optimized for being cited by AI search engines (Perplexity, ChatGPT Search, Google AI Overviews).
 
 **Why zero dependencies?** You should be able to run it anywhere without `pip install`. Python 3.7+ stdlib only.
 
