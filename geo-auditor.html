@@ -13,11 +13,11 @@
   --survey-bd: rgba(37,99,235,.12);
 }
 [data-theme="dark"] {
-  --bg: #161e2b; --card: #1e2d3d; --bd: #2d3f54; --tx: #d4dee8;
-  --mu: #7a8fa0; --ac: #5b8def; --dn: #f87171; --gn: #34d399; --or: #fbbf24;
-  --dim-bar-bg: rgba(255,255,255,.08); --hover-bg: rgba(255,255,255,.03);
-  --badge-bg: rgba(88,166,255,.1); --badge-bd: rgba(88,166,255,.2);
-  --survey-bg: rgba(88,166,255,.05); --survey-bd: rgba(88,166,255,.15);
+  --bg: #08090a; --card: #0f1011; --bd: rgba(255,255,255,.08); --tx: #e6e9ee;
+  --mu: #a8afba; --ac: #5e6ad2; --dn: #f87171; --gn: #10b981; --or: #fbbf24;
+  --dim-bar-bg: rgba(255,255,255,.05); --hover-bg: rgba(255,255,255,.03);
+  --badge-bg: rgba(94,106,210,.12); --badge-bd: rgba(94,106,210,.25);
+  --survey-bg: rgba(94,106,210,.05); --survey-bd: rgba(94,106,210,.15);
 }
 * { margin:0;padding:0;box-sizing:border-box }
 body {
@@ -181,12 +181,12 @@ Tip: Works in English, Chinese, or mixed. No industry preset needed." data-zh-pl
     <div style="margin-top:8px;color:var(--mu);font-size:11px;line-height:1.5" data-en="💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from." data-zh="💡 AI 改写为可选功能。你也可从 ChatGPT、Claude 等任意工具改写后粘贴回来重新检测——保存即自动对比，演化引擎不关心改写来源。">💡 AI Rewrite is optional. You can rewrite with ChatGPT, Claude, or any tool — paste it back, re-check, save. The evolution engine doesn't care where the rewrite came from.</div>
     <div id="apiSettings" style="display:none;margin-top:12px;padding:12px;background:var(--card);border:1px solid var(--bd);border-radius:6px;font-size:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label style="color:var(--tx)">Endpoint <input id="apiUrl" placeholder="https://api.deepseek.com/v1/chat/completions" style="width:260px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
+        <label style="color:var(--tx)">Endpoint <input id="apiUrl" placeholder="https://api.example.com/v1/chat/completions" style="width:260px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
         <label style="color:var(--tx)">Key <input id="apiKey" type="password" placeholder="sk-..." style="width:180px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
-        <label style="color:var(--tx)">Model <input id="apiModel" placeholder="deepseek-chat" style="width:130px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
+        <label style="color:var(--tx)">Model <input id="apiModel" placeholder="gpt-4o-mini" style="width:130px;padding:4px 8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);font-size:12px"></label>
         <button class="btn btn-ac btn-sm" onclick="saveApiSettings()" data-en="Save" data-zh="保存">Save</button>
       </div>
-      <div style="margin-top:6px;color:var(--mu);font-size:11px" data-en="Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked." data-zh="Key 仅存本机浏览器 localStorage，不经过任何服务器。OpenAI 兼容接口（DeepSeek/OpenAI/Gemini 兼容网关）。遇 CORS 需配代理地址。">Key stored in browser localStorage only. Never touches any server. OpenAI-compatible (DeepSeek/OpenAI/Gemini via proxy). Set proxy URL if CORS blocked.</div>
+      <div style="margin-top:6px;color:var(--mu);font-size:11px" data-en="Key stored in browser localStorage only. Never touches any server. OpenAI-compatible API (any provider)." data-zh="Key 仅存本机浏览器 localStorage，不经过任何服务器。OpenAI 兼容接口（任意厂商）。">Key stored in browser localStorage only. Never touches any server. OpenAI-compatible API (any provider).</div>
     </div>
     <div id="rewritePanel" style="display:none;margin-top:16px"></div>
     <div class="result" id="resultPanel">
@@ -1077,13 +1077,13 @@ function loadApiSettings() {
   const s = JSON.parse(localStorage.getItem('geo_api_settings')||'{}');
   document.getElementById('apiUrl').value = s.url||'';
   document.getElementById('apiKey').value = s.key||'';
-  document.getElementById('apiModel').value = s.model||'deepseek-chat';
+  document.getElementById('apiModel').value = s.model||'';
 }
 function saveApiSettings() {
   localStorage.setItem('geo_api_settings', JSON.stringify({
     url: document.getElementById('apiUrl').value.trim(),
     key: document.getElementById('apiKey').value.trim(),
-    model: document.getElementById('apiModel').value.trim()||'deepseek-chat'
+    model: document.getElementById('apiModel').value.trim()||''
   }));
   toast('✓ API saved');
 }
@@ -1180,7 +1180,50 @@ function loadLocalEvolutionWeights() {
 }
 
 // ═══ AI Rewrite Engine ═══
-const REWRITE_SYSTEM_PROMPT = "You are a content editor. Your goal is to improve this article.\n\nYou are NOT told which specific dimensions are weak. Read the full text, then freely improve it while preserving the original meaning and factual boundaries.\n\nHARD CONSTRAINTS:\n1. Do NOT add facts, numbers, citations, or cases not in the original\n2. Where data support is needed, mark [needs data] — do NOT fabricate\n3. Do NOT change brands, products, prices, or commitments\n4. Keep natural human expression — do NOT template-ize\n5. Do NOT mechanically stuff keywords\n\nOutput format:\n[Rewritten Text]\n...\n[Changes Made]\n...\n[Still Needs Manual Input]\n...";
+const REWRITE_SYSTEM_PROMPT = `You are a content editor. Your goal is to improve this article.
+
+You are NOT told which specific dimensions are weak, but you need to know what makes a good article:
+
+█ QUALITY STANDARDS (your rewrite direction)
+
+1. CONCLUSION-FIRST: The first sentence must deliver the core answer. No preamble ("With the development of..."), no throat-clearing ("In today's world..."). Reader gets the point in sentence one.
+
+2. DATA ANCHORS: Support every claim with specific numbers. Not "many projects" but "12 projects". Not "high cost" but "40% rework cost increase". Cite standards where possible (e.g. GB50981, ISO). But only use data already in the original — never fabricate.
+
+3. STRUCTURAL HIERARCHY: Use numbered lists (First/Second/Third or 1/2/3), subheadings, bullet points. Walls of text are the enemy. One paragraph = one point.
+
+4. COMPARATIVE STRUCTURE: Good articles have at least 2 "A vs B" comparisons — compliant vs non-compliant, traditional vs improved, myth vs reality. Comparison builds fast understanding.
+
+5. FAQ MODULE: Use Q&A format to address common questions. "Some may ask..." "People often confuse..." — then answer directly. At least 1-2 Q&A pairs.
+
+6. TITLE QUALITY: Good title = core keyword + search intent word + specific number/question. Not "Thoughts on XX" but "3 Most Overlooked XX Inspection Points". When editing titles, keep the original core keyword, only add what's missing.
+
+7. PARAGRAPH RHYTHM: 80-150 characters per paragraph, never exceeding 200. Vary sentence length — don't use uniform-length sentences (AI hallmark).
+
+8. CALL TO ACTION: Every article must end with a next step — "Want to learn more...", "Have questions...". Don't leave the reader hanging.
+
+9. ENTITY INFORMATION: Include real place names, organization names, roles (owner/inspector/contractor). Give the article concrete scene anchoring.
+
+█ REWRITE PRINCIPLES
+
+- Prioritize filling gaps: check what the original is missing from the 9 standards above, add it
+- Do no harm: if a standard is already met, leave it alone
+- Titles: preserve the core keyword, only micro-adjust unless the title completely fails
+- Preserve and enhance existing structure (subheadings, numbered lists, FAQ sections) — don't flatten into paragraphs
+
+█ HARD CONSTRAINTS
+1. Do NOT add facts, numbers, citations, or cases not in the original — mark gaps as [needs data]
+2. Do NOT change brands, products, prices, or commitments
+3. Keep natural human expression — no templates, no keyword stuffing
+4. No "Firstly/Secondly/Finally/In conclusion" formulaic structure
+
+Output format:
+[Rewritten Text]
+...
+[Changes Made]
+...
+[Still Needs Manual Input]
+...`;
 
 function buildRewriteUserPrompt(text) { return "Please improve the following text. Preserve the original meaning. Optimize structure, expression, and readability. Do not fabricate any facts or data not in the original.\n\nOriginal:\n"+text; }
 
@@ -1193,7 +1236,7 @@ async function aiRewrite() {
   btn.textContent='⏳ Rewriting...'; btn.disabled=true;
   try {
     const res = await fetch(s.url, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.key},
-      body: JSON.stringify({ model:s.model||'deepseek-chat', messages:[{role:'system',content:REWRITE_SYSTEM_PROMPT},{role:'user',content:buildRewriteUserPrompt(text)}], temperature:0.7, max_tokens:4096 }) });
+      body: JSON.stringify({ model:s.model||'', messages:[{role:'system',content:REWRITE_SYSTEM_PROMPT},{role:'user',content:buildRewriteUserPrompt(text)}], temperature:0.7, max_tokens:4096 }) });
     if (!res.ok) { const et=await res.text(); throw new Error('API '+res.status+': '+et.substring(0,200)); }
     const data = await res.json();
     const reply = data.choices[0].message.content;
